@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-native",
+    "types": ["react", "react-native"],
+    "baseUrl": "./",
+    "paths": {
+      "@synthara/shared": ["../../packages/shared/src"]
+    }
+  },
+  "include": ["app", "src", "index.ts", "index.tsx"],
+  "exclude": ["node_modules", "dist"]
+}
