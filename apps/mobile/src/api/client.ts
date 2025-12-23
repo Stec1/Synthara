@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { useAuthStore } from '../state/auth';
+import { APP_ENV } from '../config/appEnv';
 
 declare const process: {
   env?: {
@@ -12,6 +13,7 @@ const api = axios.create({
   baseURL: process.env?.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
+    'X-App-Env': APP_ENV,
   },
 });
 
