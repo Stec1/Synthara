@@ -58,3 +58,5 @@ export interface GameEvent {
   required_gold: number;
   created_at: string;
 }
+
+export * from './economyContracts';

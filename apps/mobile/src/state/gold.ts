@@ -9,8 +9,26 @@ export type GoldReason =
   | 'task'
   | 'gold_pass'
   | 'mint_nft'
+  | 'perk_purchase'
+  | 'demo_mint'
   | 'admin_airdrop'
   | 'creator_reward';
+
+export type PerkId =
+  | 'perk_boost_daily'
+  | 'perk_profile_badge'
+  | 'perk_creator_drop_access'
+  | 'perk_priority_matchmaking';
+
+export interface Perk {
+  id: PerkId;
+  title: string;
+  description: string;
+  priceGold: number;
+  roleGate?: UserRole;
+}
+
+export type NftTier = 'silver' | 'gold' | 'diamond';
 
 export interface GoldTransaction {
   id: string;
@@ -19,6 +37,14 @@ export interface GoldTransaction {
   amount: number;
   reason: GoldReason;
   note?: string;
+}
+
+export interface InventoryNft {
+  id: string;
+  name: string;
+  tier: NftTier;
+  createdAt: string;
+  sourcePerkId?: PerkId;
 }
 
 export interface GoldPerkState {
@@ -43,6 +69,8 @@ export interface GoldState extends GoldLimitsState {
   balance: number;
   perk: GoldPerkState;
   nfts: MockNFT[];
+  ownedPerks: Record<PerkId, boolean>;
+  inventory: InventoryNft[];
   transactions: GoldTransaction[];
   setRole: (role: UserRole) => void;
   earn: (amount: number, reason: GoldReason, note?: string) => void;
@@ -50,9 +78,11 @@ export interface GoldState extends GoldLimitsState {
   claimDaily: () => { ok: boolean; error?: string };
   completeTask: () => { ok: boolean; error?: string };
   unlockGoldPass: () => boolean;
-  mintMockNFT: () => boolean;
+  buyPerk: (perkId: PerkId) => { ok: boolean; error?: string };
+  mintMockNft: (input?: { tier?: NftTier; sourcePerkId?: PerkId }) => InventoryNft;
   adminAirdrop: () => boolean;
   creatorReward: () => boolean;
+  canAfford: (price: number) => boolean;
   resetIfNewDay: () => void;
 }
 
@@ -68,6 +98,55 @@ const createTransaction = (type: GoldTxType, amount: number, reason: GoldReason,
     note,
   }) satisfies GoldTransaction;
 
+const createOwnedPerks = (): Record<PerkId, boolean> => ({
+  perk_boost_daily: false,
+  perk_profile_badge: false,
+  perk_creator_drop_access: false,
+  perk_priority_matchmaking: false,
+});
+
+export const PERK_CATALOG: Perk[] = [
+  {
+    id: 'perk_boost_daily',
+    title: 'Daily Booster',
+    description: 'Earn +20 extra Gold on every daily claim.',
+    priceGold: 25,
+  },
+  {
+    id: 'perk_profile_badge',
+    title: 'Profile Badge',
+    description: 'Unlock an exclusive golden badge on your profile.',
+    priceGold: 50,
+  },
+  {
+    id: 'perk_creator_drop_access',
+    title: 'Creator Drop Access',
+    description: 'Early access to featured creator drops and raffles.',
+    priceGold: 120,
+  },
+  {
+    id: 'perk_priority_matchmaking',
+    title: 'Priority Matchmaking',
+    description: 'Skip queues and get matched faster in events.',
+    priceGold: 250,
+    roleGate: 'creator',
+  },
+];
+
+const createInventoryNft = (input?: { tier?: NftTier; sourcePerkId?: PerkId }): InventoryNft => {
+  const createdAt = new Date().toISOString();
+  const tier = input?.tier ?? 'gold';
+  return {
+    id: `nft-${Date.now()}`,
+    name: `Demo NFT #${Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0')}`,
+    tier,
+    createdAt,
+    sourcePerkId: input?.sourcePerkId,
+  };
+};
+
 export const useGoldStore = create<GoldState>()(
   persist(
     (set, get) => ({
@@ -75,6 +154,8 @@ export const useGoldStore = create<GoldState>()(
       balance: 0,
       perk: { hasGoldPass: false },
       nfts: [],
+      ownedPerks: createOwnedPerks(),
+      inventory: [],
       transactions: [],
       lastDailyClaimAt: undefined,
       tasksDoneToday: 0,
@@ -138,23 +219,41 @@ export const useGoldStore = create<GoldState>()(
         });
         return true;
       },
-      mintMockNFT: () => {
-        const success = get().spend(250, 'mint_nft');
-        if (!success) {
-          return false;
+      buyPerk: (perkId) => {
+        const perk = PERK_CATALOG.find((item) => item.id === perkId);
+        if (!perk) {
+          return { ok: false, error: 'Unknown perk' };
         }
-        const createdAt = new Date().toISOString();
-        const newNFT: MockNFT = {
-          id: `nft-${Date.now()}`,
-          name: `Gold NFT #${Math.floor(Math.random() * 10000)
-            .toString()
-            .padStart(4, '0')}`,
-          createdAt,
-        };
-        set((state) => ({
-          nfts: [newNFT, ...state.nfts],
+        const state = get();
+        const ownedPerks = { ...createOwnedPerks(), ...state.ownedPerks };
+        if (ownedPerks[perkId]) {
+          return { ok: false, error: 'Perk already owned' };
+        }
+        if (!state.canAfford(perk.priceGold)) {
+          return { ok: false, error: 'Not enough Gold' };
+        }
+
+        const spent = state.spend(perk.priceGold, 'perk_purchase', `Bought ${perk.title}`);
+        if (!spent) {
+          return { ok: false, error: 'Not enough Gold' };
+        }
+
+        set((current) => ({
+          ownedPerks: { ...createOwnedPerks(), ...current.ownedPerks, [perkId]: true },
         }));
-        return true;
+        return { ok: true };
+      },
+      mintMockNft: (input) => {
+        const newNFT: InventoryNft = createInventoryNft(input);
+        set((state) => ({
+          inventory: [newNFT, ...state.inventory],
+          nfts: [newNFT, ...state.nfts],
+          transactions: [
+            createTransaction('earn', 0, 'demo_mint', 'Minted demo NFT'),
+            ...state.transactions,
+          ],
+        }));
+        return newNFT;
       },
       adminAirdrop: () => {
         const state = get();
@@ -172,6 +271,7 @@ export const useGoldStore = create<GoldState>()(
         get().earn(100, 'creator_reward');
         return true;
       },
+      canAfford: (price) => get().balance >= price,
       resetIfNewDay: () => {
         const todayKey = getTodayKey();
         const state = get();

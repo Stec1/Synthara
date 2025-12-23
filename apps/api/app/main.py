@@ -10,6 +10,7 @@ from sqlmodel import Session
 from . import models
 from .database import create_db_and_tables
 from .dependencies import get_current_user, get_db_session
+from .routers import economy as economy_router
 from .routers import models as models_router
 from .schemas import AuthStartRequest, AuthStartResponse, AuthVerifyRequest, AuthVerifyResponse, UserRead
 
@@ -64,3 +65,4 @@ def list_games(session: Session = Depends(get_db_session)) -> list[models.GameEv
 
 
 app.include_router(models_router.router)
+app.include_router(economy_router.router)
