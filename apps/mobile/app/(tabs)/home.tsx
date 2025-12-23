@@ -3,14 +3,17 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ModelCard } from '../../src/components/ModelCard';
 import { useModels } from '../../src/api/hooks';
+import { useGoldStore } from '../../src/state/gold';
 
 export default function HomeScreen() {
   const { data: models = [] } = useModels();
+  const balance = useGoldStore((state) => state.balance);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.heading}>Synthara 3.0</Text>
       <Text style={styles.subheading}>Build, own, and play with AI influencer creators.</Text>
+      <Text style={styles.balance}>Gold Balance: {balance}</Text>
 
       <Section title="Trending Models">
         {models.map((model) => (
@@ -51,6 +54,11 @@ const styles = StyleSheet.create({
   subheading: {
     color: '#c5cad3',
     marginVertical: 8,
+  },
+  balance: {
+    color: '#f7c948',
+    marginBottom: 12,
+    fontWeight: '700',
   },
   section: {
     marginTop: 16,
