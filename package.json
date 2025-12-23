@@ -12,5 +12,8 @@
   "workspaces": [
     "apps/mobile",
     "packages/shared"
-  ]
+  ],
+  "devDependencies": {
+    "@react-native-community/cli-server-api": "^20.0.2"
+  }
 }

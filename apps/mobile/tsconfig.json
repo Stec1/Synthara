@@ -2,12 +2,27 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-native",
-    "types": ["react", "react-native"],
+    "types": [
+      "react",
+      "react-native"
+    ],
     "baseUrl": "./",
     "paths": {
-      "@synthara/shared": ["../../packages/shared/src"]
+      "@synthara/shared": [
+        "../../packages/shared/src"
+      ]
     }
   },
-  "include": ["app", "src", "index.ts", "index.tsx"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "app",
+    "src",
+    "index.ts",
+    "index.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
