@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
 
 import { useGoldStore, UserRole } from '../state/gold';
 
@@ -33,7 +34,7 @@ export function GoldWalletCard() {
   const claimDaily = useGoldStore((state) => state.claimDaily);
   const completeTask = useGoldStore((state) => state.completeTask);
   const unlockGoldPass = useGoldStore((state) => state.unlockGoldPass);
-  const mintMockNFT = useGoldStore((state) => state.mintMockNFT);
+  const mintMockNft = useGoldStore((state) => state.mintMockNft);
   const adminAirdrop = useGoldStore((state) => state.adminAirdrop);
   const creatorReward = useGoldStore((state) => state.creatorReward);
 
@@ -82,9 +83,8 @@ export function GoldWalletCard() {
           hint={perk.hasGoldPass ? `Active until ${formatDate(perk.goldPassExpiresAt)}` : undefined}
         />
         <ActionButton
-          label="Mint NFT (250)"
-          onPress={() => mintMockNFT()}
-          disabled={balance < 250}
+          label="Mint Demo NFT"
+          onPress={() => mintMockNft()}
         />
         {role === 'admin' && (
           <ActionButton label="Admin Airdrop +1000" onPress={() => adminAirdrop()} />
@@ -101,6 +101,19 @@ export function GoldWalletCard() {
             ? `Active until ${formatDate(perk.goldPassExpiresAt)}`
             : 'Not active'}
         </Text>
+      </View>
+
+      <View style={styles.navLinks}>
+        <Link href="/gold-shop" asChild>
+          <Pressable style={styles.navButton}>
+            <Text style={styles.navButtonText}>Open Gold Shop</Text>
+          </Pressable>
+        </Link>
+        <Link href="/nft-inventory" asChild>
+          <Pressable style={styles.navButtonSecondary}>
+            <Text style={styles.navButtonSecondaryText}>Open NFT Inventory</Text>
+          </Pressable>
+        </Link>
       </View>
 
       <View style={styles.transactions}>
@@ -244,6 +257,35 @@ const styles = StyleSheet.create({
   },
   body: {
     color: '#c5cad3',
+  },
+  navLinks: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  navButton: {
+    flex: 1,
+    backgroundColor: '#f7c948',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  navButtonText: {
+    color: '#0b0b0f',
+    fontWeight: '700',
+  },
+  navButtonSecondary: {
+    flex: 1,
+    backgroundColor: '#1f1f2d',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#252537',
+  },
+  navButtonSecondaryText: {
+    color: '#f5f5f5',
+    fontWeight: '700',
   },
   transactions: {
     gap: 6,
