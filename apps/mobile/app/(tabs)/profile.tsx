@@ -4,6 +4,7 @@ import { Link } from 'expo-router';
 
 import { useModels, useStartEmailAuth, useVerifyEmail } from '../../src/api/hooks';
 import { useAuthStore } from '../../src/state/auth';
+import { GoldWalletCard } from '../../src/components/GoldWalletCard';
 
 export default function ProfileTab() {
   const token = useAuthStore((state) => state.token);
@@ -22,6 +23,8 @@ export default function ProfileTab() {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.heading}>My Profile</Text>
       <Text style={styles.body}>Role: creator (mocked)</Text>
+
+      <GoldWalletCard />
 
       <View style={styles.authBox}>
         <Text style={styles.body}>Auth token: {token ?? 'not signed in'}</Text>
