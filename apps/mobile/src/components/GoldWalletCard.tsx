@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 
-import { useGoldStore, UserRole } from '../state/gold';
+import { calcDailyClaimAmount, getTodayKey, useGoldStore, UserRole } from '../state/gold';
 
 const roles: UserRole[] = ['fan', 'creator', 'admin'];
 
@@ -11,36 +11,69 @@ const formatDate = (value?: string) => {
   return new Date(value).toLocaleDateString();
 };
 
-const getDailyStatus = (lastDailyClaimAt?: string) => {
-  if (!lastDailyClaimAt) return { available: true, hint: 'Ready to claim' };
-  const now = Date.now();
-  const last = new Date(lastDailyClaimAt).getTime();
-  const diff = now - last;
-  if (diff >= 24 * 60 * 60 * 1000) {
-    return { available: true, hint: 'Ready to claim' };
-  }
-  const hours = Math.ceil((24 * 60 * 60 * 1000 - diff) / (60 * 60 * 1000));
-  return { available: false, hint: `Available in ${hours}h` };
-};
+const shorten = (value: string) =>
+  value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
 
 export function GoldWalletCard() {
+  const router = useRouter();
+  const [claimStatus, setClaimStatus] = useState<string | null>(null);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
+
   const role = useGoldStore((state) => state.role);
   const balance = useGoldStore((state) => state.balance);
   const perk = useGoldStore((state) => state.perk);
-  const tasksDoneToday = useGoldStore((state) => state.tasksDoneToday);
   const lastDailyClaimAt = useGoldStore((state) => state.lastDailyClaimAt);
-  const transactions = useGoldStore((state) => state.transactions);
+  const dailyClaimStreak = useGoldStore((state) => state.dailyClaimStreak);
+  const walletAddress = useGoldStore((state) => state.walletAddress);
+  const actions = useGoldStore((state) => state.actions);
+  const activeBoosts = useGoldStore((state) => state.activeBoosts);
+  const earningLog = useGoldStore((state) => state.earningLog);
   const setRole = useGoldStore((state) => state.setRole);
-  const claimDaily = useGoldStore((state) => state.claimDaily);
-  const completeTask = useGoldStore((state) => state.completeTask);
+  const claimDailyFromWallet = useGoldStore((state) => state.claimDailyFromWallet);
+  const performEarningAction = useGoldStore((state) => state.performEarningAction);
+  const canUseAction = useGoldStore((state) => state.canUseAction);
   const unlockGoldPass = useGoldStore((state) => state.unlockGoldPass);
-  const mintMockNft = useGoldStore((state) => state.mintMockNft);
-  const adminAirdrop = useGoldStore((state) => state.adminAirdrop);
-  const creatorReward = useGoldStore((state) => state.creatorReward);
 
-  const dailyStatus = useMemo(() => getDailyStatus(lastDailyClaimAt), [lastDailyClaimAt]);
-  const taskLimitReached = tasksDoneToday >= 5;
-  const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);
+  const dailyClaimAmount = useMemo(
+    () => calcDailyClaimAmount(25, activeBoosts),
+    [activeBoosts],
+  );
+  const claimedToday = useMemo(
+    () => (lastDailyClaimAt ? lastDailyClaimAt.slice(0, 10) === getTodayKey() : false),
+    [lastDailyClaimAt],
+  );
+  const boostsChips = useMemo(() => {
+    const chips: string[] = [];
+    if (activeBoosts.dailyClaimMultiplier !== 1) {
+      chips.push(`Daily x${activeBoosts.dailyClaimMultiplier.toFixed(1)}`);
+    }
+    if (activeBoosts.earningMultiplier !== 1) {
+      chips.push(`Earnings x${activeBoosts.earningMultiplier.toFixed(1)}`);
+    }
+    if (activeBoosts.dailyLimitBonus !== 0) {
+      chips.push(`Daily limits +${activeBoosts.dailyLimitBonus}`);
+    }
+    return chips;
+  }, [activeBoosts]);
+  const recentEarnings = useMemo(() => earningLog.slice(0, 5), [earningLog]);
+
+  const handleDailyClaim = () => {
+    const res = claimDailyFromWallet();
+    if (res.ok) {
+      setClaimStatus(`Claimed +${res.added ?? 0} Gold`);
+    } else {
+      setClaimStatus(res.reason ?? 'Unable to claim');
+    }
+  };
+
+  const handleAction = (id: string, title: string) => {
+    const res = performEarningAction(id);
+    if (res.ok) {
+      setActionStatus(`Earned +${res.added ?? 0} from ${title}`);
+    } else {
+      setActionStatus(res.reason ?? 'Action unavailable');
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -64,44 +97,92 @@ export function GoldWalletCard() {
       </View>
 
       <View style={styles.actions}>
-        <ActionButton
-          label="Claim Daily +50"
-          onPress={() => claimDaily()}
-          disabled={!dailyStatus.available}
-          hint={!dailyStatus.available ? dailyStatus.hint : undefined}
-        />
-        <ActionButton
-          label={`Quick Task +20 (${tasksDoneToday}/5 today)`}
-          onPress={() => completeTask()}
-          disabled={taskLimitReached}
-          hint={taskLimitReached ? 'Daily task cap reached' : undefined}
-        />
-        <ActionButton
-          label="Unlock Gold Pass (300)"
-          onPress={() => unlockGoldPass()}
-          disabled={balance < 300 || perk.hasGoldPass}
-          hint={perk.hasGoldPass ? `Active until ${formatDate(perk.goldPassExpiresAt)}` : undefined}
-        />
-        <ActionButton
-          label="Mint Demo NFT"
-          onPress={() => mintMockNft()}
-        />
-        {role === 'admin' && (
-          <ActionButton label="Admin Airdrop +1000" onPress={() => adminAirdrop()} />
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.subheading}>Daily claim</Text>
+          {dailyClaimStreak > 0 && (
+            <Text style={styles.streak}>Streak: {dailyClaimStreak}d</Text>
+          )}
+        </View>
+        {!walletAddress ? (
+          <View style={styles.walletRow}>
+            <Text style={styles.body}>Connect wallet to claim daily Gold.</Text>
+            <Pressable onPress={() => router.push('/(tabs)/settings')}>
+              <Text style={styles.link}>Go to Settings</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.dailyBox}>
+            <Text style={styles.body}>Wallet: {shorten(walletAddress)}</Text>
+            <ActionButton
+              label={`Claim daily +${dailyClaimAmount}`}
+              onPress={handleDailyClaim}
+              disabled={claimedToday}
+              hint={claimedToday ? 'Claimed today · resets at local midnight' : 'Resets at local midnight'}
+            />
+            {claimStatus ? <Text style={styles.hint}>{claimStatus}</Text> : null}
+          </View>
         )}
-        {role === 'creator' && (
-          <ActionButton label="Creator Reward +100" onPress={() => creatorReward()} />
-        )}
-      </View>
 
-      <View style={styles.perkBox}>
-        <Text style={styles.subheading}>Gold Pass</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.subheading}>Earn Gold</Text>
+          {actionStatus ? <Text style={styles.hint}>{actionStatus}</Text> : null}
+        </View>
+        {actions.slice(0, 5).map((action) => {
+          const check = canUseAction(action.id);
+          const reward = Math.floor(action.baseReward * activeBoosts.earningMultiplier);
+          return (
+            <View key={action.id} style={styles.earnRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionTitle}>{action.title}</Text>
+                <Text style={styles.body}>{action.description}</Text>
+                <Text style={styles.rewardText}>Earn +{reward} Gold</Text>
+              </View>
+              <Pressable
+                onPress={() => handleAction(action.id, action.title)}
+                disabled={!check.ok}
+                style={[styles.earnButton, !check.ok && styles.earnButtonDisabled]}
+              >
+                <Text style={[styles.earnButtonText, !check.ok && styles.actionTextDisabled]}>
+                  {check.ok ? 'Earn' : check.reason}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        })}
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.subheading}>Gold Pass</Text>
+          <Pressable
+            onPress={() => unlockGoldPass()}
+            disabled={balance < 300 || perk.hasGoldPass}
+            style={[styles.earnButtonSmall, (balance < 300 || perk.hasGoldPass) && styles.earnButtonDisabled]}
+          >
+            <Text
+              style={[styles.earnButtonText, (balance < 300 || perk.hasGoldPass) && styles.actionTextDisabled]}
+            >
+              {perk.hasGoldPass ? 'Active' : 'Unlock (300)'}
+            </Text>
+          </Pressable>
+        </View>
         <Text style={styles.body}>
           {perk.hasGoldPass
             ? `Active until ${formatDate(perk.goldPassExpiresAt)}`
             : 'Not active'}
         </Text>
       </View>
+
+      {boostsChips.length > 0 ? (
+        <View style={styles.perkBox}>
+          <Text style={styles.subheading}>Active boosts</Text>
+          <View style={styles.boostChips}>
+            {boostsChips.map((chip) => (
+              <View key={chip} style={styles.chip}>
+                <Text style={styles.chipText}>{chip}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.navLinks}>
         <Link href="/gold-shop" asChild>
@@ -118,15 +199,14 @@ export function GoldWalletCard() {
 
       <View style={styles.transactions}>
         <Text style={styles.subheading}>Recent Activity</Text>
-        {recentTransactions.length === 0 ? (
-          <Text style={styles.subdued}>No transactions yet</Text>
+        {recentEarnings.length === 0 ? (
+          <Text style={styles.subdued}>No earnings yet</Text>
         ) : (
-          recentTransactions.map((tx) => (
-            <View key={tx.id} style={styles.txRow}>
-              <Text style={styles.txReason}>{tx.reason}</Text>
-              <Text style={[styles.txAmount, tx.type === 'earn' ? styles.txEarn : styles.txSpend]}>
-                {tx.type === 'earn' ? '+' : '-'}
-                {tx.amount}
+          recentEarnings.map((log) => (
+            <View key={log.id} style={styles.txRow}>
+              <Text style={styles.txReason}>{log.type.replace('action:', '')}</Text>
+              <Text style={[styles.txAmount, styles.txEarn]}>
+                +{log.amount}
               </Text>
             </View>
           ))
@@ -219,6 +299,26 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  streak: {
+    color: '#f7c948',
+    fontWeight: '700',
+  },
+  walletRow: {
+    backgroundColor: '#1b1b26',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#252537',
+    gap: 6,
+  },
+  dailyBox: {
+    gap: 6,
+  },
   actionWrapper: {
     gap: 4,
   },
@@ -258,6 +358,10 @@ const styles = StyleSheet.create({
   body: {
     color: '#c5cad3',
   },
+  link: {
+    color: '#f7c948',
+    fontWeight: '700',
+  },
   navLinks: {
     flexDirection: 'row',
     gap: 8,
@@ -289,6 +393,62 @@ const styles = StyleSheet.create({
   },
   transactions: {
     gap: 6,
+  },
+  earnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1b1b26',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#252537',
+  },
+  actionTitle: {
+    color: '#f5f5f5',
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  rewardText: {
+    color: '#7dd97c',
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  earnButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#f7c948',
+  },
+  earnButtonSmall: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f7c948',
+  },
+  earnButtonDisabled: {
+    backgroundColor: '#2a2a36',
+  },
+  earnButtonText: {
+    color: '#0b0b0f',
+    fontWeight: '700',
+  },
+  boostChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#252537',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#37374a',
+  },
+  chipText: {
+    color: '#f5f5f5',
+    fontWeight: '700',
   },
   txRow: {
     flexDirection: 'row',

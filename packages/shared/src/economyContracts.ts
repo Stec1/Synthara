@@ -19,10 +19,33 @@ export interface NftInventoryItemDTO {
   chain?: SupportedChain;
 }
 
+export interface EarningActionDTO {
+  id: string;
+  title: string;
+  description: string;
+  baseReward: number;
+  cooldownSeconds: number;
+  dailyLimit: number;
+  roleGate?: string;
+}
+
+export interface EarningLogItemDTO {
+  id: string;
+  type: string;
+  amount: number;
+  createdAt: string;
+  note?: string;
+}
+
 export interface UserEconomySnapshotDTO {
   balance: number;
   ownedPerks: Record<string, boolean>;
   inventory: NftInventoryItemDTO[];
+  walletAddress?: string | null;
+  lastDailyClaimAt?: string | null;
+  dailyClaimStreak?: number;
+  earningLog?: EarningLogItemDTO[];
+  earningActions?: EarningActionDTO[];
 }
 
 export interface PurchasePerkRequestDTO {

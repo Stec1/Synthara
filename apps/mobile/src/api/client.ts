@@ -24,4 +24,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+export const getEconomyMe = () => api.get('/economy/me');
+
 export default api;
