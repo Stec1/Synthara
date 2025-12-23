@@ -3,10 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ..dependencies import require_write_access
+
 router = APIRouter(prefix="/economy", tags=["economy"])
+read_router = APIRouter(tags=["economy"])
 
 
 class GoldShopPerkDTO(BaseModel):
@@ -109,7 +112,10 @@ def list_perks() -> List[GoldShopPerkDTO]:
 
 
 @router.post("/perks/purchase", response_model=PurchasePerkResponseDTO)
-def purchase_perk(payload: PurchasePerkRequestDTO) -> PurchasePerkResponseDTO:
+def purchase_perk(
+    payload: PurchasePerkRequestDTO,
+    _user=Depends(require_write_access),
+) -> PurchasePerkResponseDTO:
     snapshot = get_snapshot()
     perk = next((item for item in PERK_CATALOG if item.id == payload.perkId), None)
     if not perk:
@@ -135,7 +141,10 @@ def purchase_perk(payload: PurchasePerkRequestDTO) -> PurchasePerkResponseDTO:
 
 
 @router.post("/nfts/mint", response_model=MintNftResponseDTO)
-def mint_nft(payload: MintNftRequestDTO) -> MintNftResponseDTO:
+def mint_nft(
+    payload: MintNftRequestDTO,
+    _user=Depends(require_write_access),
+) -> MintNftResponseDTO:
     snapshot = get_snapshot()
     inventory: List[Dict[str, object]] = snapshot["inventory"]  # type: ignore[assignment]
     minted = {
@@ -149,3 +158,17 @@ def mint_nft(payload: MintNftRequestDTO) -> MintNftResponseDTO:
     minted_item = NftInventoryItemDTO(**minted)
     inventory.insert(0, minted_item.dict())
     return MintNftResponseDTO(nft=minted_item, balance=snapshot["balance"])
+
+
+@read_router.get("/inventory/me", response_model=List[NftInventoryItemDTO])
+def get_my_inventory() -> List[NftInventoryItemDTO]:
+    snapshot = get_snapshot()
+    inventory: List[Dict[str, object]] = snapshot["inventory"]  # type: ignore[assignment]
+    return [NftInventoryItemDTO(**item) for item in inventory]
+
+
+@read_router.get("/entitlements/me", response_model=Dict[str, bool])
+def get_my_entitlements() -> Dict[str, bool]:
+    snapshot = get_snapshot()
+    owned_perks: Dict[str, bool] = snapshot["ownedPerks"]  # type: ignore[assignment]
+    return owned_perks

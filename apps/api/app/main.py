@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
 from . import models
+from .config import get_app_env
 from .database import create_db_and_tables
 from .dependencies import get_current_user, get_db_session
 from .routers import economy as economy_router
@@ -49,11 +50,25 @@ def read_current_user(user: Annotated[models.User, Depends(get_current_user)]) -
 
 @app.get("/health")
 def healthcheck() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "env": get_app_env()}
 
 
 @app.get("/games", response_model=list[models.GameEvent])
 def list_games(session: Session = Depends(get_db_session)) -> list[models.GameEvent]:
+    return _get_or_seed_games(session)
+
+
+@app.get("/games/rooms", response_model=list[models.GameEvent])
+def list_game_rooms(session: Session = Depends(get_db_session)) -> list[models.GameEvent]:
+    return _get_or_seed_games(session)
+
+
+app.include_router(models_router.router)
+app.include_router(economy_router.router)
+app.include_router(economy_router.read_router)
+
+
+def _get_or_seed_games(session: Session) -> list[models.GameEvent]:
     events = session.query(models.GameEvent).all()
     if not events:
         fallback = models.GameEvent(name="Durak Arena", required_gold=1)
@@ -62,7 +77,3 @@ def list_games(session: Session = Depends(get_db_session)) -> list[models.GameEv
         session.refresh(fallback)
         events = [fallback]
     return events
-
-
-app.include_router(models_router.router)
-app.include_router(economy_router.router)

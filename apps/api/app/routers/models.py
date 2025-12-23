@@ -6,7 +6,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
-from ..dependencies import get_current_user, get_db_session
+from ..dependencies import get_db_session, require_dev_admin, require_write_access
 from ..models import Auction, GoldNFTDrop, LoRAAsset, ModelProfile
 from ..schemas import (
   AuctionCreate,
@@ -35,7 +35,11 @@ def list_models(session: Session = Depends(get_db_session)) -> List[ModelProfile
 
 
 @router.post("", response_model=ModelProfileRead, status_code=status.HTTP_201_CREATED)
-def create_model(payload: ModelProfileCreate, session: Session = Depends(get_db_session)) -> ModelProfileRead:
+def create_model(
+    payload: ModelProfileCreate,
+    session: Session = Depends(get_db_session),
+    _user=Depends(require_write_access),
+) -> ModelProfileRead:
     model = ModelProfile(
         name=payload.name,
         tagline=payload.tagline,
@@ -78,6 +82,7 @@ def update_model(
     model_id: int,
     payload: ModelProfileUpdate,
     session: Session = Depends(get_db_session),
+    _user=Depends(require_write_access),
 ) -> ModelProfileRead:
     model = session.get(ModelProfile, model_id)
     if not model:
@@ -109,7 +114,7 @@ def create_lora(
     model_id: int,
     payload: LoRACreate,
     session: Session = Depends(get_db_session),
-    _user=Depends(get_current_user),
+    _user=Depends(require_write_access),
 ) -> LoRARead:
     model = session.get(ModelProfile, model_id)
     if not model:
@@ -139,7 +144,7 @@ def create_gold_drop(
     model_id: int,
     payload: GoldDropCreate,
     session: Session = Depends(get_db_session),
-    _user=Depends(get_current_user),
+    _user=Depends(require_write_access),
 ) -> GoldDropRead:
     model = session.get(ModelProfile, model_id)
     if not model:
@@ -163,7 +168,7 @@ def create_gold_auction(
     model_id: int,
     payload: AuctionCreate,
     session: Session = Depends(get_db_session),
-    _user=Depends(get_current_user),
+    _user=Depends(require_write_access),
 ) -> AuctionRead:
     model = session.get(ModelProfile, model_id)
     if not model:
@@ -181,7 +186,10 @@ def create_gold_auction(
 
 
 @router.post("/seed", response_model=List[ModelProfileRead], status_code=status.HTTP_201_CREATED)
-def seed_demo_content(session: Session = Depends(get_db_session)) -> List[ModelProfileRead]:
+def seed_demo_content(
+    session: Session = Depends(get_db_session),
+    _admin=Depends(require_dev_admin),
+) -> List[ModelProfileRead]:
     if session.exec(select(ModelProfile)).first():
         return list_models(session)
 
