@@ -30,7 +30,8 @@ export function GoldWalletCard() {
   const role = useGoldStore((state) => state.role);
   const balance = useGoldStore((state) => state.balance);
   const perk = useGoldStore((state) => state.perk);
-  const ownedPerks = useGoldStore((state) => state.ownedPerks);
+  const perkInventory = useGoldStore((state) => state.perkInventory);
+  const perkCatalog = useGoldStore((state) => state.perkCatalog);
   const lastDailyClaimAt = useGoldStore((state) => state.lastDailyClaimAt);
   const dailyClaimStreak = useGoldStore((state) => state.dailyClaimStreak);
   const walletAddress = useGoldStore((state) => state.walletAddress);
@@ -43,7 +44,10 @@ export function GoldWalletCard() {
   const canUseAction = useGoldStore((state) => state.canUseAction);
   const unlockGoldPass = useGoldStore((state) => state.unlockGoldPass);
 
-  const perkEffects = useMemo(() => getPerkEffectsForOwned(ownedPerks), [ownedPerks]);
+  const perkEffects = useMemo(
+    () => getPerkEffectsForOwned(perkInventory, perkCatalog),
+    [perkInventory, perkCatalog],
+  );
   const dailyClaimAvailability = useMemo(
     () => canClaimDailyUtc(lastDailyClaimAt),
     [lastDailyClaimAt],

@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { getEconomyMe } from '../api/client';
-import { RewardActionId, RewardPerkEffect, calculateGoldPoints } from '../domain/rewardEngine';
+import { RewardActionId, RewardPerkEffect, RewardPerkEffectType, calculateGoldPoints } from '../domain/rewardEngine';
 
 export type UserRole = 'fan' | 'creator' | 'admin';
 export type GoldTxType = 'earn' | 'spend';
@@ -16,7 +16,8 @@ export type GoldReason =
   | 'demo_mint'
   | 'admin_airdrop'
   | 'creator_reward'
-  | 'earning_action';
+  | 'earning_action'
+  | 'reward_ticket';
 
 export type PerkId =
   | 'perk_boost_daily'
@@ -27,12 +28,57 @@ export type PerkId =
   | 'perk_earn_boost_10'
   | 'perk_daily_limit_plus_5';
 
-export interface Perk {
+export type PerkEffect = {
+  type: RewardPerkEffectType;
+  value: number;
+  mode: 'add' | 'mul';
+};
+
+export type PerkDuration = {
+  kind: 'PERMANENT' | 'TIME_LIMITED' | 'USES';
+  value?: number;
+};
+
+export type PerkStackingRule = 'NONE' | 'ADDITIVE' | 'MULTIPLICATIVE';
+export type PerkCategory = 'BOOST' | 'ACCESS' | 'COSMETIC' | 'GAME';
+
+export interface PerkDefinition {
   id: PerkId;
   title: string;
   description: string;
   priceGold: number;
   roleGate?: UserRole;
+  effects?: PerkEffect[];
+  duration?: PerkDuration;
+  stackingRule?: PerkStackingRule;
+  category?: PerkCategory;
+}
+
+export type PerkInventorySource = 'SHOP_PURCHASE' | 'REWARD_TICKET' | 'ADMIN_GRANT';
+
+export interface PerkInventoryItem {
+  id: string;
+  perkId: PerkId;
+  acquiredAt: string;
+  source: PerkInventorySource;
+  expiresAt?: string;
+  remainingUses?: number;
+}
+
+export type RewardTicketReward =
+  | { kind: 'GOLD_POINTS'; amount: number }
+  | { kind: 'PERK_ITEM'; perkId: PerkId }
+  | { kind: 'NFT_PLACEHOLDER'; name: string; tier?: 'silver' | 'gold' | 'diamond' };
+
+export type RewardTicketStatus = 'PENDING' | 'CLAIMED' | 'EXPIRED';
+
+export interface RewardTicket {
+  id: string;
+  createdAt: string;
+  source: 'GAME_MATCH' | 'EVENT' | 'ADMIN';
+  status: RewardTicketStatus;
+  expiresAt?: string;
+  reward: RewardTicketReward;
 }
 
 export type NftTier = 'silver' | 'gold' | 'diamond';
@@ -52,6 +98,7 @@ export interface InventoryNft {
   tier: NftTier;
   createdAt: string;
   sourcePerkId?: PerkId;
+  isPlaceholder?: boolean;
 }
 
 export interface GoldPerkState {
@@ -111,8 +158,10 @@ export interface GoldState extends GoldLimitsState {
   balance: number;
   perk: GoldPerkState;
   nfts: MockNFT[];
-  ownedPerks: Record<PerkId, boolean>;
   inventory: InventoryNft[];
+  perkInventory: PerkInventoryItem[];
+  rewardTickets: RewardTicket[];
+  perkCatalog: PerkDefinition[];
   transactions: GoldTransaction[];
   walletAddress: string | null;
   dailyClaimStreak: number;
@@ -130,7 +179,8 @@ export interface GoldState extends GoldLimitsState {
   completeTask: () => { ok: boolean; error?: string };
   unlockGoldPass: () => boolean;
   buyPerk: (perkId: PerkId) => { ok: boolean; error?: string };
-  mintMockNft: (input?: { tier?: NftTier; sourcePerkId?: PerkId }) => InventoryNft;
+  mintMockNft: (input?: { tier?: NftTier; sourcePerkId?: PerkId; isPlaceholder?: boolean; name?: string }) => InventoryNft;
+  claimRewardTicket: (ticketId: string) => { ok: boolean; error?: string };
   adminAirdrop: () => boolean;
   creatorReward: () => boolean;
   canAfford: (price: number) => boolean;
@@ -142,10 +192,13 @@ export interface GoldState extends GoldLimitsState {
   ) => { ok: boolean; added?: number; reason?: string };
   canUseAction: (actionId: string, params?: { modelId?: string }) => { ok: boolean; reason?: string };
   recomputeBoosts: () => void;
+  getOwnedPerks: () => Record<PerkId, boolean>;
+  getActivePerkEffects: (now?: number) => RewardPerkEffect[];
   setApiSyncEnabled: (enabled: boolean) => void;
   syncFromApi: () => Promise<{ ok: boolean; reason?: string }>;
   resetIfNewDay: () => void;
 }
+
 export const getTodayKey = () => {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, '0');
@@ -195,34 +248,112 @@ const createTransaction = (type: GoldTxType, amount: number, reason: GoldReason,
     note,
   }) satisfies GoldTransaction;
 
-const createOwnedPerks = (): Record<PerkId, boolean> => ({
-  perk_boost_daily: false,
-  perk_profile_badge: false,
-  perk_creator_drop_access: false,
-  perk_priority_matchmaking: false,
-  perk_daily_boost_20: false,
-  perk_earn_boost_10: false,
-  perk_daily_limit_plus_5: false,
-});
+const createInventoryNft = (input?: {
+  tier?: NftTier;
+  sourcePerkId?: PerkId;
+  isPlaceholder?: boolean;
+  name?: string;
+}): InventoryNft => {
+  const createdAt = new Date().toISOString();
+  const tier = input?.tier ?? 'gold';
+  return {
+    id: `nft-${Date.now()}`,
+    name: input?.isPlaceholder
+      ? input.name ?? `Reward NFT ${Math.floor(Math.random() * 1000)}`
+      : `Demo NFT #${Math.floor(Math.random() * 10000)
+          .toString()
+          .padStart(4, '0')}`,
+    tier,
+    createdAt,
+    sourcePerkId: input?.sourcePerkId,
+    isPlaceholder: input?.isPlaceholder,
+  };
+};
 
-export const PERK_CATALOG: Perk[] = [
+const createMockRewardTickets = (): RewardTicket[] => {
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  return [
+    {
+      id: 'ticket-gold-1',
+      createdAt: new Date(now - oneDay).toISOString(),
+      source: 'GAME_MATCH',
+      status: 'PENDING',
+      expiresAt: new Date(now + 7 * oneDay).toISOString(),
+      reward: { kind: 'GOLD_POINTS', amount: 150 },
+    },
+    {
+      id: 'ticket-perk-1',
+      createdAt: new Date(now - 2 * oneDay).toISOString(),
+      source: 'EVENT',
+      status: 'PENDING',
+      expiresAt: new Date(now + 5 * oneDay).toISOString(),
+      reward: { kind: 'PERK_ITEM', perkId: 'perk_earn_boost_10' },
+    },
+    {
+      id: 'ticket-nft-1',
+      createdAt: new Date(now - 3 * oneDay).toISOString(),
+      source: 'ADMIN',
+      status: 'CLAIMED',
+      reward: { kind: 'NFT_PLACEHOLDER', name: 'Mystery Drop', tier: 'gold' },
+    },
+  ];
+};
+
+const createPerkInventoryItem = (
+  perk: PerkDefinition,
+  source: PerkInventorySource,
+  now: number,
+): PerkInventoryItem => {
+  const expiresAt =
+    perk.duration?.kind === 'TIME_LIMITED' && perk.duration.value
+      ? new Date(now + perk.duration.value * 1000).toISOString()
+      : undefined;
+  const remainingUses = perk.duration?.kind === 'USES' ? perk.duration.value : undefined;
+  return {
+    id: `perk-item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    perkId: perk.id,
+    acquiredAt: new Date(now).toISOString(),
+    source,
+    expiresAt,
+    remainingUses,
+  };
+};
+
+const defaultActiveBoosts: ActiveBoosts = {
+  dailyClaimMultiplier: 1,
+  earningMultiplier: 1,
+  dailyLimitBonus: 0,
+};
+
+export const PERK_CATALOG: PerkDefinition[] = [
   {
     id: 'perk_boost_daily',
     title: 'Daily Booster',
     description: 'Earn +20 extra Gold on every daily claim.',
     priceGold: 25,
+    effects: [{ type: 'DAILY_CLAIM_BONUS', value: 20, mode: 'add' }],
+    duration: { kind: 'TIME_LIMITED', value: 7 * 24 * 60 * 60 },
+    stackingRule: 'NONE',
+    category: 'BOOST',
   },
   {
     id: 'perk_profile_badge',
     title: 'Profile Badge',
     description: 'Unlock an exclusive golden badge on your profile.',
     priceGold: 50,
+    stackingRule: 'NONE',
+    duration: { kind: 'PERMANENT' },
+    category: 'COSMETIC',
   },
   {
     id: 'perk_creator_drop_access',
     title: 'Creator Drop Access',
     description: 'Early access to featured creator drops and raffles.',
     priceGold: 120,
+    stackingRule: 'NONE',
+    duration: { kind: 'PERMANENT' },
+    category: 'ACCESS',
   },
   {
     id: 'perk_priority_matchmaking',
@@ -230,24 +361,39 @@ export const PERK_CATALOG: Perk[] = [
     description: 'Skip queues and get matched faster in events.',
     priceGold: 250,
     roleGate: 'creator',
+    stackingRule: 'NONE',
+    duration: { kind: 'PERMANENT' },
+    category: 'GAME',
   },
   {
     id: 'perk_daily_boost_20',
     title: 'Daily Boost +20%',
     description: 'Increase daily wallet claims by 20%.',
     priceGold: 120,
+    effects: [{ type: 'DAILY_CLAIM_MULTIPLIER', value: 0.2, mode: 'mul' }],
+    duration: { kind: 'TIME_LIMITED', value: 3 * 24 * 60 * 60 },
+    stackingRule: 'ADDITIVE',
+    category: 'BOOST',
   },
   {
     id: 'perk_earn_boost_10',
     title: 'Earnings Boost +10%',
     description: 'All earning actions pay out 10% more Gold.',
     priceGold: 140,
+    effects: [{ type: 'EARNING_MULTIPLIER', value: 0.1, mode: 'mul' }],
+    duration: { kind: 'PERMANENT' },
+    stackingRule: 'MULTIPLICATIVE',
+    category: 'BOOST',
   },
   {
     id: 'perk_daily_limit_plus_5',
     title: 'Daily Limits +5',
     description: 'Get 5 extra attempts on earning actions each day.',
     priceGold: 95,
+    effects: [{ type: 'DAILY_LIMIT_BONUS', value: 5, mode: 'add' }],
+    duration: { kind: 'USES', value: 50 },
+    stackingRule: 'ADDITIVE',
+    category: 'BOOST',
   },
 ];
 
@@ -310,85 +456,29 @@ export const DEFAULT_ACTIONS: EarningAction[] = [
   },
 ];
 
-export const defaultActiveBoosts: ActiveBoosts = {
-  dailyClaimMultiplier: 1,
-  earningMultiplier: 1,
-  dailyLimitBonus: 0,
+const ensureModelTracker = (tracker?: ModelActionTracker) => {
+  const dayKeyUTC = getUtcDayKey();
+  if (!tracker || tracker.dayKeyUTC !== dayKeyUTC) {
+    return { dayKeyUTC, modelIds: [] };
+  }
+  return tracker;
 };
 
-const buildPerkEffects = (ownedPerks: Record<PerkId, boolean>): RewardPerkEffect[] => {
-  const effects: RewardPerkEffect[] = [];
-  if (ownedPerks.perk_daily_boost_20) {
-    effects.push({ type: 'DAILY_CLAIM_MULTIPLIER', value: 0.2, mode: 'mul' });
-  }
-  if (ownedPerks.perk_earn_boost_10) {
-    effects.push({ type: 'EARNING_MULTIPLIER', value: 0.1, mode: 'mul' });
-  }
-  if (ownedPerks.perk_daily_limit_plus_5) {
-    effects.push({ type: 'DAILY_LIMIT_BONUS', value: 5, mode: 'add' });
-  }
-  if (ownedPerks.perk_boost_daily) {
-    effects.push({ type: 'DAILY_CLAIM_MULTIPLIER', value: 0.2, mode: 'mul' });
-  }
-  return effects;
-};
-
-const deriveActiveBoostsFromEffects = (effects: RewardPerkEffect[]): ActiveBoosts =>
-  effects.reduce<ActiveBoosts>(
-    (acc, effect) => {
-      switch (effect.type) {
-        case 'DAILY_CLAIM_MULTIPLIER':
-          return { ...acc, dailyClaimMultiplier: acc.dailyClaimMultiplier + effect.value };
-        case 'EARNING_MULTIPLIER':
-          return { ...acc, earningMultiplier: acc.earningMultiplier + effect.value };
-        case 'DAILY_LIMIT_BONUS':
-          return { ...acc, dailyLimitBonus: acc.dailyLimitBonus + effect.value };
-        default:
-          return acc;
-      }
-    },
-    { ...defaultActiveBoosts },
+const createDefaultActionState = (
+  todayKey: string,
+  actions: EarningAction[] = DEFAULT_ACTIONS,
+): Record<string, EarningActionStateEntry> =>
+  actions.reduce<Record<string, EarningActionStateEntry>>(
+    (acc, action) => ({
+      ...acc,
+      [action.id]: {
+        lastUsedAt: null,
+        usedTodayCount: 0,
+        todayKey,
+      },
+    }),
+    {},
   );
-
-export const getPerkEffectsForOwned = (ownedPerks: Record<PerkId, boolean>) =>
-  buildPerkEffects(ownedPerks);
-
-export const applyPerkBoosts = (ownedPerks: Record<PerkId, boolean>, role: UserRole) => {
-  const effects = buildPerkEffects(ownedPerks);
-  // creator-only perks still respect gating placeholder
-  if (role !== 'creator' && ownedPerks.perk_priority_matchmaking) {
-    return deriveActiveBoostsFromEffects(effects);
-  }
-  return deriveActiveBoostsFromEffects(effects);
-};
-
-export const calcDailyClaimAmount = (
-  base: number,
-  perkEffects: RewardPerkEffect[] = [],
-  streak?: number,
-  streakAdd?: number,
-  streakCap?: number,
-) =>
-  calculateGoldPoints('DAILY_CLAIM', {
-    baseReward: base,
-    streak,
-    streakAdd,
-    streakCap,
-    perkEffects: perkEffects ?? [],
-    isGoldHolder: false,
-  }).finalGold;
-
-const ensureActionStateEntry = (
-  actionId: string,
-  actionState: Record<string, EarningActionStateEntry>,
-  todayKey = getTodayKey(),
-): EarningActionStateEntry => {
-  const entry = actionState[actionId];
-  if (!entry || entry.todayKey !== todayKey) {
-    return { lastUsedAt: null, usedTodayCount: 0, todayKey };
-  }
-  return entry;
-};
 
 const normalizeActionId = (actionId: string): RewardActionId | null => {
   if (DEFAULT_ACTIONS.some((action) => action.id === actionId)) {
@@ -432,43 +522,167 @@ const migrateActionState = (
   return migrated;
 };
 
-const ensureModelTracker = (tracker?: ModelActionTracker) => {
-  const dayKeyUTC = getUtcDayKey();
-  if (!tracker || tracker.dayKeyUTC !== dayKeyUTC) {
-    return { dayKeyUTC, modelIds: [] };
+const ensureActionStateEntry = (
+  actionId: string,
+  actionState: Record<string, EarningActionStateEntry>,
+  todayKey = getTodayKey(),
+): EarningActionStateEntry => {
+  const entry = actionState[actionId];
+  if (!entry || entry.todayKey !== todayKey) {
+    return { lastUsedAt: null, usedTodayCount: 0, todayKey };
   }
-  return tracker;
+  return entry;
 };
 
-const createInventoryNft = (input?: { tier?: NftTier; sourcePerkId?: PerkId }): InventoryNft => {
-  const createdAt = new Date().toISOString();
-  const tier = input?.tier ?? 'gold';
-  return {
-    id: `nft-${Date.now()}`,
-    name: `Demo NFT #${Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0')}`,
-    tier,
-    createdAt,
-    sourcePerkId: input?.sourcePerkId,
+const buildPerkInventoryFromLegacy = (ownedPerks?: Record<PerkId, boolean>): PerkInventoryItem[] => {
+  if (!ownedPerks) return [];
+  const now = Date.now();
+  const entries: PerkInventoryItem[] = [];
+  Object.entries(ownedPerks).forEach(([perkId, owned]) => {
+    if (!owned) return;
+    const perk = PERK_CATALOG.find((item) => item.id === perkId);
+    if (!perk) return;
+    entries.push(createPerkInventoryItem(perk, 'SHOP_PURCHASE', now));
+  });
+  return entries;
+};
+
+export const isPerkItemActive = (item: PerkInventoryItem, now: number) => {
+  if (item.expiresAt && new Date(item.expiresAt).getTime() < now) {
+    return false;
+  }
+  if (item.remainingUses !== undefined && item.remainingUses <= 0) {
+    return false;
+  }
+  return true;
+};
+
+const aggregatePerkEffects = (
+  perkInventory: PerkInventoryItem[],
+  catalog: PerkDefinition[],
+  now: number,
+): RewardPerkEffect[] => {
+  type Acc = {
+    addValue: number;
+    mulValue: number;
+    mulFactor: number;
+    strongestAdd?: PerkEffect;
+    strongestMul?: PerkEffect;
   };
+  const acc: Partial<Record<RewardPerkEffectType, Acc>> = {};
+  perkInventory.forEach((item) => {
+    if (!isPerkItemActive(item, now)) return;
+    const perk = catalog.find((entry) => entry.id === item.perkId);
+    if (!perk?.effects || perk.effects.length === 0) return;
+    const stackingRule: PerkStackingRule = perk.stackingRule ?? 'ADDITIVE';
+    perk.effects.forEach((effect) => {
+      const bucket = (acc[effect.type] = acc[effect.type] ?? {
+        addValue: 0,
+        mulValue: 0,
+        mulFactor: 1,
+      });
+      if (stackingRule === 'NONE') {
+        if (effect.mode === 'mul') {
+          if (!bucket.strongestMul || Math.abs(effect.value) > Math.abs(bucket.strongestMul.value)) {
+            bucket.strongestMul = effect;
+          }
+        } else {
+          if (!bucket.strongestAdd || Math.abs(effect.value) > Math.abs(bucket.strongestAdd.value)) {
+            bucket.strongestAdd = effect;
+          }
+        }
+        return;
+      }
+      if (stackingRule === 'ADDITIVE') {
+        if (effect.mode === 'mul') {
+          bucket.mulValue += effect.value;
+        } else {
+          bucket.addValue += effect.value;
+        }
+        return;
+      }
+      // MULTIPLICATIVE
+      if (effect.mode === 'mul') {
+        bucket.mulFactor *= 1 + effect.value;
+      } else {
+        bucket.addValue += effect.value;
+      }
+    });
+  });
+
+  return Object.entries(acc).flatMap(([type, bucket]) => {
+    if (!bucket) return [];
+    const addValue = bucket.addValue + (bucket.strongestAdd?.value ?? 0);
+    const mulBase = bucket.mulValue + (bucket.strongestMul?.value ?? 0);
+    const combinedMultiplier = (1 + mulBase) * bucket.mulFactor - 1;
+    const effects: RewardPerkEffect[] = [];
+    if (addValue !== 0) {
+      effects.push({ type: type as RewardPerkEffectType, value: addValue, mode: 'add' });
+    }
+    if (combinedMultiplier !== 0) {
+      effects.push({ type: type as RewardPerkEffectType, value: combinedMultiplier, mode: 'mul' });
+    }
+    return effects;
+  });
 };
 
-const createDefaultActionState = (
-  todayKey: string,
-  actions: EarningAction[] = DEFAULT_ACTIONS,
-): Record<string, EarningActionStateEntry> =>
-  actions.reduce<Record<string, EarningActionStateEntry>>(
-    (acc, action) => ({
-      ...acc,
-      [action.id]: {
-        lastUsedAt: null,
-        usedTodayCount: 0,
-        todayKey,
-      },
-    }),
-    {},
+export const getPerkEffectsForOwned = (
+  perkInventory: PerkInventoryItem[],
+  catalog: PerkDefinition[] = PERK_CATALOG,
+  now = Date.now(),
+) => aggregatePerkEffects(perkInventory, catalog, now);
+
+const deriveActiveBoostsFromEffects = (effects: RewardPerkEffect[]): ActiveBoosts =>
+  effects.reduce<ActiveBoosts>(
+    (acc, effect) => {
+      switch (effect.type) {
+        case 'DAILY_CLAIM_MULTIPLIER':
+          return { ...acc, dailyClaimMultiplier: acc.dailyClaimMultiplier + effect.value };
+        case 'EARNING_MULTIPLIER':
+          return { ...acc, earningMultiplier: acc.earningMultiplier + effect.value };
+        case 'DAILY_LIMIT_BONUS':
+          return { ...acc, dailyLimitBonus: acc.dailyLimitBonus + effect.value };
+        case 'DAILY_CLAIM_BONUS':
+        default:
+          return acc;
+      }
+    },
+    { ...defaultActiveBoosts },
   );
+
+export const applyPerkBoosts = (
+  perkInventory: PerkInventoryItem[],
+  catalog: PerkDefinition[] = PERK_CATALOG,
+) => {
+  const effects = getPerkEffectsForOwned(perkInventory, catalog);
+  return deriveActiveBoostsFromEffects(effects);
+};
+
+export const calcDailyClaimAmount = (
+  base: number,
+  perkEffects: RewardPerkEffect[] = [],
+  streak?: number,
+  streakAdd?: number,
+  streakCap?: number,
+) =>
+  calculateGoldPoints('DAILY_CLAIM', {
+    baseReward: base,
+    streak,
+    streakAdd,
+    streakCap,
+    perkEffects: perkEffects ?? [],
+    isGoldHolder: false,
+  }).finalGold;
+
+const createOwnedPerks = (): Record<PerkId, boolean> => ({
+  perk_boost_daily: false,
+  perk_profile_badge: false,
+  perk_creator_drop_access: false,
+  perk_priority_matchmaking: false,
+  perk_daily_boost_20: false,
+  perk_earn_boost_10: false,
+  perk_daily_limit_plus_5: false,
+});
 
 export const useGoldStore = create<GoldState>()(
   persist(
@@ -477,8 +691,10 @@ export const useGoldStore = create<GoldState>()(
       balance: 0,
       perk: { hasGoldPass: false },
       nfts: [],
-      ownedPerks: createOwnedPerks(),
       inventory: [],
+      perkInventory: [],
+      rewardTickets: createMockRewardTickets(),
+      perkCatalog: PERK_CATALOG,
       transactions: [],
       lastDailyClaimAt: null,
       tasksDoneToday: 0,
@@ -488,7 +704,7 @@ export const useGoldStore = create<GoldState>()(
       earningLog: [],
       actions: DEFAULT_ACTIONS,
       actionState: createDefaultActionState(getTodayKey(), DEFAULT_ACTIONS),
-      activeBoosts: applyPerkBoosts(createOwnedPerks(), 'fan'),
+      activeBoosts: { ...defaultActiveBoosts },
       viewedModelsToday: { dayKeyUTC: getUtcDayKey(), modelIds: [] },
       sharedModelsToday: { dayKeyUTC: getUtcDayKey(), modelIds: [] },
       apiSyncEnabled: false,
@@ -547,14 +763,18 @@ export const useGoldStore = create<GoldState>()(
         return true;
       },
       buyPerk: (perkId) => {
-        const perk = PERK_CATALOG.find((item) => item.id === perkId);
+        const perk = get().perkCatalog.find((item) => item.id === perkId);
         if (!perk) {
           return { ok: false, error: 'Unknown perk' };
         }
         const state = get();
-        const ownedPerks = { ...createOwnedPerks(), ...state.ownedPerks };
-        if (ownedPerks[perkId]) {
-          return { ok: false, error: 'Perk already owned' };
+        const now = Date.now();
+        const existingItems = state.perkInventory.filter((item) => item.perkId === perkId);
+        const hasPermanent = existingItems.some((item) => !item.expiresAt && item.remainingUses === undefined);
+        const hasActive = existingItems.some((item) => isPerkItemActive(item, now));
+
+        if (perk.stackingRule === 'NONE' && (hasPermanent || hasActive)) {
+          return { ok: false, error: 'Perk already active' };
         }
         if (!state.canAfford(perk.priceGold)) {
           return { ok: false, error: 'Not enough Gold' };
@@ -565,23 +785,73 @@ export const useGoldStore = create<GoldState>()(
           return { ok: false, error: 'Not enough Gold' };
         }
 
+        const newItem = createPerkInventoryItem(perk, 'SHOP_PURCHASE', now);
         set((current) => ({
-          ownedPerks: { ...createOwnedPerks(), ...current.ownedPerks, [perkId]: true },
+          perkInventory: [newItem, ...current.perkInventory],
         }));
         get().recomputeBoosts();
         return { ok: true };
       },
       mintMockNft: (input) => {
         const newNFT: InventoryNft = createInventoryNft(input);
+        const txReason: GoldReason = input?.isPlaceholder ? 'reward_ticket' : 'demo_mint';
         set((state) => ({
           inventory: [newNFT, ...state.inventory],
           nfts: [newNFT, ...state.nfts],
           transactions: [
-            createTransaction('earn', 0, 'demo_mint', 'Minted demo NFT'),
+            createTransaction(
+              'earn',
+              0,
+              txReason,
+              newNFT.isPlaceholder ? 'Received reward NFT' : 'Minted demo NFT',
+            ),
             ...state.transactions,
           ],
         }));
         return newNFT;
+      },
+      claimRewardTicket: (ticketId) => {
+        const state = get();
+        const ticket = state.rewardTickets.find((item) => item.id === ticketId);
+        if (!ticket) {
+          return { ok: false, error: 'Ticket not found' };
+        }
+        if (ticket.status !== 'PENDING') {
+          return { ok: false, error: 'Ticket already processed' };
+        }
+        const now = Date.now();
+        if (ticket.expiresAt && new Date(ticket.expiresAt).getTime() < now) {
+          set(({ rewardTickets }) => ({
+            rewardTickets: rewardTickets.map((t) => (t.id === ticketId ? { ...t, status: 'EXPIRED' } : t)),
+          }));
+          return { ok: false, error: 'Ticket expired' };
+        }
+
+        if (ticket.reward.kind === 'GOLD_POINTS') {
+          get().earn(ticket.reward.amount, 'reward_ticket', 'Claimed reward ticket');
+        }
+        if (ticket.reward.kind === 'PERK_ITEM') {
+          const perk = state.perkCatalog.find((entry) => entry.id === ticket.reward.perkId);
+          if (perk) {
+            const newItem = createPerkInventoryItem(perk, 'REWARD_TICKET', now);
+            set((current) => ({ perkInventory: [newItem, ...current.perkInventory] }));
+          }
+        }
+        if (ticket.reward.kind === 'NFT_PLACEHOLDER') {
+          get().mintMockNft({
+            tier: ticket.reward.tier,
+            isPlaceholder: true,
+            name: ticket.reward.name,
+          });
+        }
+
+        set(({ rewardTickets }) => ({
+          rewardTickets: rewardTickets.map((t) =>
+            t.id === ticketId ? { ...t, status: 'CLAIMED' } : t,
+          ),
+        }));
+        get().recomputeBoosts();
+        return { ok: true };
       },
       adminAirdrop: () => {
         const state = get();
@@ -617,7 +887,7 @@ export const useGoldStore = create<GoldState>()(
           elapsed >= 24 * 60 * 60 * 1000 && elapsed <= 48 * 60 * 60 * 1000
             ? state.dailyClaimStreak + 1
             : 1;
-        const perkEffects = getPerkEffectsForOwned(state.ownedPerks);
+        const perkEffects = state.getActivePerkEffects();
         const { finalGold } = calculateGoldPoints('DAILY_CLAIM', {
           baseReward: 25,
           streak,
@@ -651,7 +921,7 @@ export const useGoldStore = create<GoldState>()(
         const state = get();
         const action =
           state.actions.find((item) => item.id === normalizedId) ?? getCanonicalAction(normalizedId);
-        const perkEffects = getPerkEffectsForOwned(state.ownedPerks);
+        const perkEffects = state.getActivePerkEffects();
         const { finalGold } = calculateGoldPoints(normalizedId, {
           baseReward: action.baseReward,
           perkEffects,
@@ -760,8 +1030,22 @@ export const useGoldStore = create<GoldState>()(
       },
       recomputeBoosts: () => {
         const state = get();
-        const boosts = applyPerkBoosts(state.ownedPerks, state.role);
+        const boosts = applyPerkBoosts(state.perkInventory, state.perkCatalog);
         set({ activeBoosts: boosts });
+      },
+      getOwnedPerks: () => {
+        const now = Date.now();
+        const owned: Record<PerkId, boolean> = { ...createOwnedPerks() };
+        get().perkInventory.forEach((item) => {
+          if (isPerkItemActive(item, now)) {
+            owned[item.perkId] = true;
+          }
+        });
+        return owned;
+      },
+      getActivePerkEffects: (now) => {
+        const state = get();
+        return getPerkEffectsForOwned(state.perkInventory, state.perkCatalog, now ?? Date.now());
       },
       setApiSyncEnabled: (enabled) => set({ apiSyncEnabled: enabled }),
       syncFromApi: async () => {
@@ -780,13 +1064,31 @@ export const useGoldStore = create<GoldState>()(
           const nextOwnedPerks = data.ownedPerks
             ? ({ ...createOwnedPerks(), ...data.ownedPerks } as Record<PerkId, boolean>)
             : undefined;
+          const perkInventory = Array.isArray(data.perkInventory)
+            ? (data.perkInventory as PerkInventoryItem[])
+            : Array.isArray(data.inventorySnapshot?.perks)
+            ? (data.inventorySnapshot.perks as PerkInventoryItem[])
+            : undefined;
+          const rewardTickets = Array.isArray(data.rewardTickets)
+            ? (data.rewardTickets as RewardTicket[])
+            : undefined;
           set((current) => {
             const normalizedActions = normalizeActions(incomingActions ?? current.actions);
+            const migratedPerks =
+              perkInventory && perkInventory.length > 0
+                ? perkInventory
+                : current.perkInventory.length > 0
+                ? current.perkInventory
+                : buildPerkInventoryFromLegacy(
+                    nextOwnedPerks ??
+                      (current as unknown as { ownedPerks?: Record<PerkId, boolean> }).ownedPerks,
+                  );
             return {
               balance: typeof data.balance === 'number' ? data.balance : current.balance,
-              ownedPerks: nextOwnedPerks ?? current.ownedPerks,
+              perkInventory: migratedPerks,
               inventory: Array.isArray(data.inventory) ? data.inventory : current.inventory,
               nfts: Array.isArray(data.inventory) ? data.inventory : current.nfts,
+              rewardTickets: rewardTickets ?? current.rewardTickets,
               walletAddress:
                 data.walletAddress !== undefined ? (data.walletAddress as string | null) : current.walletAddress,
               lastDailyClaimAt:
@@ -855,6 +1157,12 @@ export const useGoldStore = create<GoldState>()(
           );
           state.viewedModelsToday = ensureModelTracker(state.viewedModelsToday);
           state.sharedModelsToday = ensureModelTracker(state.sharedModelsToday);
+          if (!state.perkInventory || state.perkInventory.length === 0) {
+            const legacyOwnedPerks = (state as unknown as { ownedPerks?: Record<PerkId, boolean> }).ownedPerks;
+            state.perkInventory = buildPerkInventoryFromLegacy(legacyOwnedPerks);
+          }
+          state.rewardTickets = state.rewardTickets ?? createMockRewardTickets();
+          state.perkCatalog = state.perkCatalog ?? PERK_CATALOG;
           state.recomputeBoosts?.();
         }
       },
