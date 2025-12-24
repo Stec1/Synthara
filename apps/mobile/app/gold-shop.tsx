@@ -1,17 +1,69 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { PERK_CATALOG, Perk, useGoldStore } from '../src/state/gold';
+import {
+  PERK_CATALOG,
+  PerkDefinition,
+  isPerkItemActive,
+  useGoldStore,
+} from '../src/state/gold';
+
+const formatDuration = (perk: PerkDefinition) => {
+  if (!perk.duration) return 'No duration';
+  if (perk.duration.kind === 'PERMANENT') return 'Permanent';
+  if (perk.duration.kind === 'USES') return `${perk.duration.value ?? 0} uses`;
+  const days = Math.max(1, Math.round((perk.duration.value ?? 0) / (24 * 60 * 60)));
+  return `${days} days`;
+};
+
+const formatStacking = (rule?: PerkDefinition['stackingRule']) => {
+  switch (rule) {
+    case 'NONE':
+      return 'Single-use';
+    case 'MULTIPLICATIVE':
+      return 'Stacks (multiplicative)';
+    case 'ADDITIVE':
+    default:
+      return 'Stacks (additive)';
+  }
+};
+
+const formatEffect = (value: number, mode: 'add' | 'mul' = 'add') => {
+  if (mode === 'mul') {
+    return `${Math.round(value * 100)}%`;
+  }
+  return `${value > 0 ? '+' : ''}${value}`;
+};
+
+const formatEffectLabel = (perk: PerkDefinition) =>
+  (perk.effects ?? []).map((effect) => {
+    switch (effect.type) {
+      case 'DAILY_CLAIM_BONUS':
+        return `Daily claim bonus ${formatEffect(effect.value, effect.mode)}`;
+      case 'DAILY_CLAIM_MULTIPLIER':
+        return `Daily claim x${(1 + effect.value).toFixed(2)}`;
+      case 'EARNING_MULTIPLIER':
+        return `Earnings x${(1 + effect.value).toFixed(2)}`;
+      case 'DAILY_LIMIT_BONUS':
+        return `Daily limit ${formatEffect(effect.value, effect.mode)}`;
+      default:
+        return `${effect.type} ${formatEffect(effect.value, effect.mode)}`;
+    }
+  });
 
 export default function GoldShopScreen() {
   const balance = useGoldStore((state) => state.balance);
   const role = useGoldStore((state) => state.role);
-  const ownedPerks = useGoldStore((state) => state.ownedPerks);
+  const perkInventory = useGoldStore((state) => state.perkInventory);
+  const perkCatalog = useGoldStore((state) => state.perkCatalog);
+  const getOwnedPerks = useGoldStore((state) => state.getOwnedPerks);
   const buyPerk = useGoldStore((state) => state.buyPerk);
   const canAfford = useGoldStore((state) => state.canAfford);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const perks = useMemo(() => PERK_CATALOG, []);
+  const perks = useMemo(() => perkCatalog ?? PERK_CATALOG, [perkCatalog]);
+  const ownedPerks = useMemo(() => getOwnedPerks(), [getOwnedPerks, perkInventory]);
+  const now = Date.now();
 
   const handleBuy = (perk: Perk) => {
     if (perk.roleGate && perk.roleGate !== role) {
@@ -38,9 +90,18 @@ export default function GoldShopScreen() {
 
       <View style={styles.list}>
         {perks.map((perk) => {
+          const activeItems = perkInventory.filter(
+            (item) => item.perkId === perk.id && isPerkItemActive(item, now),
+          );
           const owned = Boolean(ownedPerks?.[perk.id]);
+          const hasPermanent = activeItems.some(
+            (item) => !item.expiresAt && item.remainingUses === undefined,
+          );
           const roleMismatch = perk.roleGate && perk.roleGate !== role;
-          const canBuy = canAfford(perk.priceGold) && !owned && !roleMismatch;
+          const canBuy =
+            canAfford(perk.priceGold) &&
+            !roleMismatch &&
+            (perk.stackingRule !== 'NONE' || (!hasPermanent && !owned));
           return (
             <View key={perk.id} style={styles.card}>
               <View style={styles.cardHeader}>
@@ -50,8 +111,27 @@ export default function GoldShopScreen() {
                 </View>
                 <Text style={styles.price}>{perk.priceGold} Gold</Text>
               </View>
+              <Text style={styles.hintText}>
+                {formatDuration(perk)} • {formatStacking(perk.stackingRule)}
+              </Text>
+              {(perk.effects?.length ?? 0) > 0 ? (
+                <View style={styles.effectsBox}>
+                  {formatEffectLabel(perk).map((label) => (
+                    <Text key={label} style={styles.effectText}>
+                      • {label}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
               {perk.roleGate ? (
                 <Text style={styles.hintText}>Requires {perk.roleGate} role</Text>
+              ) : null}
+              {activeItems.length > 0 ? (
+                <Text style={styles.activeText}>
+                  {hasPermanent
+                    ? 'Owned (permanent)'
+                    : `Active (${activeItems[0]?.expiresAt ? `expires ${new Date(activeItems[0]?.expiresAt ?? '').toLocaleDateString()}` : 'in use'})`}
+                </Text>
               ) : null}
               <Pressable
                 onPress={() => handleBuy(perk)}
@@ -138,6 +218,17 @@ const styles = StyleSheet.create({
   },
   hintText: {
     color: '#8d93a3',
+    fontSize: 12,
+  },
+  activeText: {
+    color: '#7dd97c',
+    fontSize: 12,
+  },
+  effectsBox: {
+    gap: 2,
+  },
+  effectText: {
+    color: '#c5cad3',
     fontSize: 12,
   },
   buyButton: {

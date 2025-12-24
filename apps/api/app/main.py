@@ -13,6 +13,7 @@ from .database import create_db_and_tables
 from .dependencies import get_current_user, get_db_session
 from .routers import economy as economy_router
 from .routers import models as models_router
+from .routers import rewards as rewards_router
 from .schemas import AuthStartRequest, AuthStartResponse, AuthVerifyRequest, AuthVerifyResponse, UserRead
 
 app = FastAPI(title="Synthara 3.0 API", version="0.1.0")
@@ -66,6 +67,7 @@ def list_game_rooms(session: Session = Depends(get_db_session)) -> list[models.G
 app.include_router(models_router.router)
 app.include_router(economy_router.router)
 app.include_router(economy_router.read_router)
+app.include_router(rewards_router.router)
 
 
 def _get_or_seed_games(session: Session) -> list[models.GameEvent]:
