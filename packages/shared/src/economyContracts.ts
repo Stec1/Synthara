@@ -6,6 +6,11 @@ export interface GoldShopPerkDTO {
   description: string;
   priceGold: number;
   roleGate?: string;
+  type?: 'BOOST' | 'GAME' | 'COSMETIC' | 'ACCESS';
+  stackingRule?: 'NONE' | 'ADDITIVE' | 'MULTIPLICATIVE';
+  durationType?: 'PERMANENT' | 'TIME_LIMITED' | 'USES';
+  durationValue?: number;
+  effects?: PerkEffectDTO[];
 }
 
 export type NftTierDTO = 'silver' | 'gold' | 'diamond';
@@ -27,6 +32,12 @@ export interface EarningActionDTO {
   cooldownSeconds: number;
   dailyLimit: number;
   roleGate?: string;
+}
+
+export interface PerkEffectDTO {
+  type: string;
+  value: number;
+  mode?: 'add' | 'mul';
 }
 
 export interface EarningLogItemDTO {

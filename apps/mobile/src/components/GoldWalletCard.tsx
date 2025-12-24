@@ -2,7 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 
-import { calcDailyClaimAmount, getTodayKey, useGoldStore, UserRole } from '../state/gold';
+import {
+  calcDailyClaimAmount,
+  canClaimDailyUtc,
+  formatRemaining,
+  getPerkEffectsForOwned,
+  useGoldStore,
+  UserRole,
+} from '../state/gold';
+import { calculateGoldPoints } from '../domain/rewardEngine';
 
 const roles: UserRole[] = ['fan', 'creator', 'admin'];
 
@@ -22,6 +30,7 @@ export function GoldWalletCard() {
   const role = useGoldStore((state) => state.role);
   const balance = useGoldStore((state) => state.balance);
   const perk = useGoldStore((state) => state.perk);
+  const ownedPerks = useGoldStore((state) => state.ownedPerks);
   const lastDailyClaimAt = useGoldStore((state) => state.lastDailyClaimAt);
   const dailyClaimStreak = useGoldStore((state) => state.dailyClaimStreak);
   const walletAddress = useGoldStore((state) => state.walletAddress);
@@ -34,14 +43,31 @@ export function GoldWalletCard() {
   const canUseAction = useGoldStore((state) => state.canUseAction);
   const unlockGoldPass = useGoldStore((state) => state.unlockGoldPass);
 
-  const dailyClaimAmount = useMemo(
-    () => calcDailyClaimAmount(25, activeBoosts),
-    [activeBoosts],
-  );
-  const claimedToday = useMemo(
-    () => (lastDailyClaimAt ? lastDailyClaimAt.slice(0, 10) === getTodayKey() : false),
+  const perkEffects = useMemo(() => getPerkEffectsForOwned(ownedPerks), [ownedPerks]);
+  const dailyClaimAvailability = useMemo(
+    () => canClaimDailyUtc(lastDailyClaimAt),
     [lastDailyClaimAt],
   );
+  const nextStreak = useMemo(() => {
+    if (!lastDailyClaimAt) return 1;
+    const last = new Date(lastDailyClaimAt).getTime();
+    const elapsed = Date.now() - last;
+    if (elapsed >= 24 * 60 * 60 * 1000 && elapsed <= 48 * 60 * 60 * 1000) {
+      return dailyClaimStreak + 1;
+    }
+    if (elapsed > 48 * 60 * 60 * 1000) {
+      return 1;
+    }
+    return Math.max(dailyClaimStreak, 1);
+  }, [dailyClaimStreak, lastDailyClaimAt]);
+  const dailyClaimAmount = useMemo(
+    () => calcDailyClaimAmount(25, perkEffects, nextStreak, 0),
+    [nextStreak, perkEffects],
+  );
+  const claimBlocked = !dailyClaimAvailability.ok;
+  const claimHint = claimBlocked && dailyClaimAvailability.remainingMs !== undefined
+    ? `Claim available in ${formatRemaining(dailyClaimAvailability.remainingMs)}`
+    : 'Claim once every 24h (UTC)';
   const boostsChips = useMemo(() => {
     const chips: string[] = [];
     if (activeBoosts.dailyClaimMultiplier !== 1) {
@@ -66,8 +92,8 @@ export function GoldWalletCard() {
     }
   };
 
-  const handleAction = (id: string, title: string) => {
-    const res = performEarningAction(id);
+  const handleAction = (id: string, title: string, modelId?: string) => {
+    const res = performEarningAction(id, modelId ? { modelId } : undefined);
     if (res.ok) {
       setActionStatus(`Earned +${res.added ?? 0} from ${title}`);
     } else {
@@ -116,8 +142,8 @@ export function GoldWalletCard() {
             <ActionButton
               label={`Claim daily +${dailyClaimAmount}`}
               onPress={handleDailyClaim}
-              disabled={claimedToday}
-              hint={claimedToday ? 'Claimed today · resets at local midnight' : 'Resets at local midnight'}
+              disabled={claimBlocked}
+              hint={claimHint}
             />
             {claimStatus ? <Text style={styles.hint}>{claimStatus}</Text> : null}
           </View>
@@ -128,8 +154,16 @@ export function GoldWalletCard() {
           {actionStatus ? <Text style={styles.hint}>{actionStatus}</Text> : null}
         </View>
         {actions.slice(0, 5).map((action) => {
-          const check = canUseAction(action.id);
-          const reward = Math.floor(action.baseReward * activeBoosts.earningMultiplier);
+          const modelId =
+            action.id === 'VIEW_MODEL_PROFILE' || action.id === 'SHARE_PROFILE'
+              ? 'demo-model'
+              : undefined;
+          const check = canUseAction(action.id, modelId ? { modelId } : undefined);
+          const reward = calculateGoldPoints(action.id, {
+            baseReward: action.baseReward,
+            perkEffects,
+            isGoldHolder: false,
+          }).finalGold;
           return (
             <View key={action.id} style={styles.earnRow}>
               <View style={{ flex: 1 }}>
@@ -138,7 +172,7 @@ export function GoldWalletCard() {
                 <Text style={styles.rewardText}>Earn +{reward} Gold</Text>
               </View>
               <Pressable
-                onPress={() => handleAction(action.id, action.title)}
+                onPress={() => handleAction(action.id, action.title, modelId)}
                 disabled={!check.ok}
                 style={[styles.earnButton, !check.ok && styles.earnButtonDisabled]}
               >
