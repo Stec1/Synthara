@@ -3,17 +3,21 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 
+import { useTheme } from '../../src/ui';
+
 export default function TabsLayout() {
+  const { theme, colorScheme } = useTheme();
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#0b0b0f' }}>
-      <StatusBar style="light" />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       <Tabs
         screenOptions={{
-          headerStyle: { backgroundColor: '#0b0b0f' },
-          headerTintColor: '#f5f5f5',
-          tabBarStyle: { backgroundColor: '#0b0b0f', borderTopColor: '#222' },
-          tabBarActiveTintColor: '#f7c948',
-          tabBarInactiveTintColor: '#9aa0aa',
+          headerStyle: { backgroundColor: theme.colors.background },
+          headerTintColor: theme.colors.text,
+          tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border },
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: theme.colors.subdued,
         }}
       >
         <Tabs.Screen name="home" options={{ title: 'Home' }} />
