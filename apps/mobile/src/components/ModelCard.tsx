@@ -1,8 +1,10 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { ModelProfile } from '@synthara/shared';
+
+import { Badge, Card, useTheme } from '../ui';
 
 interface Props {
   model: ModelProfile;
@@ -10,58 +12,33 @@ interface Props {
 
 export function ModelCard({ model }: Props) {
   const router = useRouter();
+  const { theme } = useTheme();
 
   return (
-    <Pressable style={styles.card} onPress={() => router.push({ pathname: '/profile/model', params: { id: String(model.id) } })}>
-      <Text style={styles.name}>{model.name}</Text>
-      <Text style={styles.tagline}>{model.tagline}</Text>
-      <View style={styles.tags}>
+    <Card
+      onPress={() =>
+        router.push({ pathname: '/profile/model', params: { id: String(model.id) } })
+      }
+      style={{ gap: theme.spacing.sm }}
+    >
+      <View style={{ gap: theme.spacing.xs }}>
+        <Text style={[theme.typography.heading, { color: theme.colors.text }]}>{model.name}</Text>
+        <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>{model.tagline}</Text>
+      </View>
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: theme.spacing.xs,
+        }}
+      >
         {model.tags.map((tag) => (
-          <Text key={tag} style={styles.tag}>
-            #{tag}
-          </Text>
+          <Badge key={tag} tone="primary" label={`#${tag}`} />
         ))}
       </View>
-      <Text style={styles.meta}>Created {new Date(model.created_at).toLocaleDateString()}</Text>
-    </Pressable>
+      <Text style={[theme.typography.caption, { color: theme.colors.subdued }]}>
+        Created {new Date(model.created_at).toLocaleDateString()}
+      </Text>
+    </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#15151f',
-    padding: 16,
-    borderRadius: 12,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#252537',
-  },
-  name: {
-    color: '#f5f5f5',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  tagline: {
-    color: '#b3b8c2',
-    marginTop: 4,
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-    gap: 8,
-  },
-  tag: {
-    color: '#f7c948',
-    backgroundColor: '#1f1f2d',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  meta: {
-    color: '#7f8593',
-    marginTop: 8,
-    fontSize: 12,
-  },
-});

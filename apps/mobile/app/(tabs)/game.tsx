@@ -1,61 +1,55 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+
+import { Badge, Card, Screen, SectionHeader, useTheme } from '../../src/ui';
 
 export default function GameTab() {
+  const { theme } = useTheme();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.heading}>Games</Text>
-      <Text style={styles.subheading}>Durak-inspired modes coming soon.</Text>
+    <Screen>
+      <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ gap: theme.spacing.xs }}>
+          <Text style={[theme.typography.title, { color: theme.colors.text }]}>Games</Text>
+          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+            Durak-inspired modes coming soon.
+          </Text>
+        </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Durak Arena</Text>
-        <Text style={styles.body}>Gold required to enter. Matchmaking in progress.</Text>
-        <Text style={styles.badge}>Requires Gold</Text>
-      </View>
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader title="Mode Queue" subtitle="Wireframe-only placeholders" />
+          <Card>
+            <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>
+              Durak Arena
+            </Text>
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Gold required to enter. Matchmaking in progress.
+            </Text>
+            <Badge tone="primary" label="Requires Gold" />
+          </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Solo Challenges</Text>
-        <Text style={styles.body}>Practice hands with your favorite AI models.</Text>
-        <Text style={styles.badge}>Requires Gold</Text>
+          <Card>
+            <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>
+              Solo Challenges
+            </Text>
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Practice hands with your favorite AI models.
+            </Text>
+            <Badge tone="primary" label="Requires Gold" />
+          </Card>
+        </View>
+
+        <Card muted>
+          <SectionHeader
+            title="Game Rewards"
+            subtitle="Placeholder for drop and leaderboard summaries."
+          />
+          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+            Expect reward ladders, leaderboard callouts, and claim timers here. No mechanics are
+            wired yet.
+          </Text>
+        </Card>
       </View>
-    </ScrollView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  heading: {
-    color: '#f5f5f5',
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  subheading: {
-    color: '#c5cad3',
-    marginVertical: 8,
-  },
-  card: {
-    backgroundColor: '#15151f',
-    padding: 14,
-    borderRadius: 10,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#252537',
-  },
-  cardTitle: {
-    color: '#f5f5f5',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  body: {
-    color: '#c5cad3',
-    marginTop: 4,
-  },
-  badge: {
-    marginTop: 10,
-    color: '#f7c948',
-    fontWeight: '700',
-  },
-});

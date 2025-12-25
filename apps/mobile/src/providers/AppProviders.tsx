@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { PropsWithChildren, useEffect, useMemo } from 'react';
 
 import { useGoldStore } from '../state/gold';
+import { ThemeProvider } from '../ui';
 
 const queryClient = new QueryClient();
 
@@ -12,5 +13,9 @@ export function AppProviders({ children }: PropsWithChildren) {
     useGoldStore.getState().resetIfNewDay();
   }, []);
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <ThemeProvider>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    </ThemeProvider>
+  );
 }

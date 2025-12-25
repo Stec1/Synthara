@@ -11,6 +11,7 @@ import {
   UserRole,
 } from '../state/gold';
 import { calculateGoldPoints } from '../domain/rewardEngine';
+import { Card, Divider, Theme, useTheme } from '../ui';
 
 const roles: UserRole[] = ['fan', 'creator', 'admin'];
 
@@ -26,6 +27,8 @@ export function GoldWalletCard() {
   const router = useRouter();
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const role = useGoldStore((state) => state.role);
   const balance = useGoldStore((state) => state.balance);
@@ -106,7 +109,7 @@ export function GoldWalletCard() {
   };
 
   return (
-    <View style={styles.card}>
+    <Card style={{ gap: theme.spacing.md }}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Gold Wallet</Text>
         <Text style={styles.balance}>{balance} Gold</Text>
@@ -148,6 +151,7 @@ export function GoldWalletCard() {
               onPress={handleDailyClaim}
               disabled={claimBlocked}
               hint={claimHint}
+              styles={styles}
             />
             {claimStatus ? <Text style={styles.hint}>{claimStatus}</Text> : null}
           </View>
@@ -187,6 +191,8 @@ export function GoldWalletCard() {
             </View>
           );
         })}
+
+        <Divider />
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.subheading}>Gold Pass</Text>
@@ -250,20 +256,24 @@ export function GoldWalletCard() {
           ))
         )}
       </View>
-    </View>
+    </Card>
   );
 }
+
+type WalletStyles = ReturnType<typeof createStyles>;
 
 function ActionButton({
   label,
   disabled,
   onPress,
   hint,
+  styles,
 }: {
   label: string;
   disabled?: boolean;
   onPress: () => void;
   hint?: string;
+  styles: WalletStyles;
 }) {
   return (
     <View style={styles.actionWrapper}>
@@ -279,230 +289,221 @@ function ActionButton({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#15151f',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#252537',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  title: {
-    color: '#f5f5f5',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  balance: {
-    color: '#f7c948',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  subdued: {
-    color: '#8d93a3',
-    marginBottom: 4,
-  },
-  roleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  roleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#1f1f2d',
-    borderWidth: 1,
-    borderColor: '#252537',
-    alignItems: 'center',
-  },
-  roleButtonActive: {
-    backgroundColor: '#f7c948',
-    borderColor: '#f7c948',
-  },
-  roleText: {
-    color: '#c5cad3',
-    fontWeight: '700',
-  },
-  roleTextActive: {
-    color: '#0b0b0f',
-  },
-  actions: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  streak: {
-    color: '#f7c948',
-    fontWeight: '700',
-  },
-  walletRow: {
-    backgroundColor: '#1b1b26',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#252537',
-    gap: 6,
-  },
-  dailyBox: {
-    gap: 6,
-  },
-  actionWrapper: {
-    gap: 4,
-  },
-  actionButton: {
-    backgroundColor: '#f7c948',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  actionButtonDisabled: {
-    backgroundColor: '#2a2a36',
-  },
-  actionText: {
-    color: '#0b0b0f',
-    fontWeight: '700',
-  },
-  actionTextDisabled: {
-    color: '#8d93a3',
-  },
-  hint: {
-    color: '#8d93a3',
-    fontSize: 12,
-  },
-  perkBox: {
-    backgroundColor: '#1b1b26',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#252537',
-    marginBottom: 12,
-  },
-  subheading: {
-    color: '#f5f5f5',
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  body: {
-    color: '#c5cad3',
-  },
-  link: {
-    color: '#f7c948',
-    fontWeight: '700',
-  },
-  navLinks: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  navButton: {
-    flex: 1,
-    backgroundColor: '#f7c948',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  navButtonText: {
-    color: '#0b0b0f',
-    fontWeight: '700',
-  },
-  navButtonSecondary: {
-    flex: 1,
-    backgroundColor: '#1f1f2d',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#252537',
-  },
-  navButtonSecondaryText: {
-    color: '#f5f5f5',
-    fontWeight: '700',
-  },
-  transactions: {
-    gap: 6,
-  },
-  earnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#1b1b26',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#252537',
-  },
-  actionTitle: {
-    color: '#f5f5f5',
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  rewardText: {
-    color: '#7dd97c',
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  earnButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#f7c948',
-  },
-  earnButtonSmall: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f7c948',
-  },
-  earnButtonDisabled: {
-    backgroundColor: '#2a2a36',
-  },
-  earnButtonText: {
-    color: '#0b0b0f',
-    fontWeight: '700',
-  },
-  boostChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#252537',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#37374a',
-  },
-  chipText: {
-    color: '#f5f5f5',
-    fontWeight: '700',
-  },
-  txRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  txReason: {
-    color: '#c5cad3',
-    textTransform: 'capitalize',
-  },
-  txAmount: {
-    fontWeight: '700',
-  },
-  txEarn: {
-    color: '#7dd97c',
-  },
-  txSpend: {
-    color: '#f08c42',
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+    },
+    title: {
+      ...theme.typography.heading,
+      color: theme.colors.text,
+    },
+    balance: {
+      ...theme.typography.heading,
+      color: theme.colors.primary,
+    },
+    subdued: {
+      ...theme.typography.body,
+      color: theme.colors.subdued,
+      marginBottom: theme.spacing.xs,
+    },
+    roleRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.sm,
+    },
+    roleButton: {
+      flex: 1,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    roleButtonActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    roleText: {
+      ...theme.typography.label,
+      color: theme.colors.subdued,
+    },
+    roleTextActive: {
+      color: theme.colors.inverseText,
+    },
+    actions: {
+      gap: theme.spacing.sm,
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    streak: {
+      ...theme.typography.label,
+      color: theme.colors.primary,
+    },
+    walletRow: {
+      backgroundColor: theme.colors.surfaceMuted,
+      padding: theme.spacing.md,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: theme.spacing.xs,
+    },
+    dailyBox: {
+      gap: theme.spacing.xs,
+    },
+    actionWrapper: {
+      gap: theme.spacing.xs,
+    },
+    actionButton: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.md,
+      alignItems: 'center',
+    },
+    actionButtonDisabled: {
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    actionText: {
+      ...theme.typography.label,
+      color: theme.colors.inverseText,
+    },
+    actionTextDisabled: {
+      color: theme.colors.subdued,
+    },
+    hint: {
+      ...theme.typography.caption,
+      color: theme.colors.subdued,
+    },
+    perkBox: {
+      backgroundColor: theme.colors.surfaceMuted,
+      padding: theme.spacing.md,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: theme.spacing.xs,
+    },
+    subheading: {
+      ...theme.typography.subtitle,
+      color: theme.colors.text,
+    },
+    body: {
+      ...theme.typography.body,
+      color: theme.colors.subdued,
+    },
+    link: {
+      ...theme.typography.label,
+      color: theme.colors.primary,
+    },
+    navLinks: {
+      flexDirection: 'row',
+      gap: theme.spacing.sm,
+    },
+    navButton: {
+      flex: 1,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.md,
+      alignItems: 'center',
+    },
+    navButtonText: {
+      ...theme.typography.label,
+      color: theme.colors.inverseText,
+    },
+    navButtonSecondary: {
+      flex: 1,
+      backgroundColor: theme.colors.surfaceMuted,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.md,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    navButtonSecondaryText: {
+      ...theme.typography.label,
+      color: theme.colors.text,
+    },
+    transactions: {
+      gap: theme.spacing.xs,
+    },
+    earnRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.md,
+      backgroundColor: theme.colors.surfaceMuted,
+      padding: theme.spacing.md,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    actionTitle: {
+      ...theme.typography.subtitle,
+      color: theme.colors.text,
+      marginBottom: 2,
+    },
+    rewardText: {
+      ...theme.typography.label,
+      color: theme.colors.success,
+      marginTop: theme.spacing.xs,
+    },
+    earnButton: {
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.colors.primary,
+    },
+    earnButtonSmall: {
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.xs,
+      borderRadius: theme.radius.sm,
+      backgroundColor: theme.colors.primary,
+    },
+    earnButtonDisabled: {
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    earnButtonText: {
+      ...theme.typography.label,
+      color: theme.colors.inverseText,
+    },
+    boostChips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.xs,
+    },
+    chip: {
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: theme.spacing.xs,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderRadius: theme.radius.pill,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    chipText: {
+      ...theme.typography.caption,
+      color: theme.colors.text,
+    },
+    txRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    txReason: {
+      ...theme.typography.body,
+      color: theme.colors.subdued,
+      textTransform: 'capitalize',
+    },
+    txAmount: {
+      ...theme.typography.body,
+      fontWeight: '700',
+    },
+    txEarn: {
+      color: theme.colors.success,
+    },
+    txSpend: {
+      color: theme.colors.warning,
+    },
+  });

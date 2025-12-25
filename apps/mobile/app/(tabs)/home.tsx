@@ -1,75 +1,96 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { ModelCard } from '../../src/components/ModelCard';
 import { useModels } from '../../src/api/hooks';
+import { ModelCard } from '../../src/components/ModelCard';
+import {
+  Badge,
+  Card,
+  Divider,
+  Screen,
+  SectionHeader,
+  useTheme,
+} from '../../src/ui';
 import { useGoldStore } from '../../src/state/gold';
 
 export default function HomeScreen() {
   const { data: models = [] } = useModels();
   const balance = useGoldStore((state) => state.balance);
+  const { theme } = useTheme();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.heading}>Synthara 3.0</Text>
-      <Text style={styles.subheading}>Build, own, and play with AI influencer creators.</Text>
-      <Text style={styles.balance}>Gold Balance: {balance}</Text>
+    <Screen>
+      <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text style={[theme.typography.title, { color: theme.colors.text }]}>Synthara 3.0</Text>
+          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+            Build, own, and play with AI influencer creators.
+          </Text>
+          <Badge tone="primary" label={`Gold Balance: ${balance}`} />
+        </View>
 
-      <Section title="Trending Models">
-        {models.map((model) => (
-          <ModelCard key={model.id} model={model} />
-        ))}
-      </Section>
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader title="Trending Models" subtitle="Fresh talent from the creator vault." />
+          {models.length === 0 ? (
+            <Card muted>
+              <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+                Models loading from the network.
+              </Text>
+            </Card>
+          ) : null}
+          {models.map((model) => (
+            <ModelCard key={model.id} model={model} />
+          ))}
+        </View>
 
-      <Section title="Gold Drops Live">
-        <Text style={styles.body}>Track fixed-price Gold drops and grab early access.</Text>
-      </Section>
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader
+            title="Gold Access"
+            subtitle="GoldAccessCard placeholder for premium entry points."
+          />
+          <Card>
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Early access queues and member-only drops will land here. Keep an eye on your pass
+              status.
+            </Text>
+            <Divider />
+            <Text style={[theme.typography.caption, { color: theme.colors.subdued }]}>
+              Placeholder block only — no actions wired yet.
+            </Text>
+          </Card>
+        </View>
 
-      <Section title="Auctions Ending Soon">
-        <Text style={styles.body}>Bid on Diamond and Gold auctions before timers expire.</Text>
-      </Section>
-    </ScrollView>
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader title="Gold Drops Live" subtitle="Track fixed-price releases." />
+          <Card>
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Track fixed-price Gold drops and grab early access without leaving this screen.
+            </Text>
+          </Card>
+        </View>
+
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader title="Auctions Ending Soon" subtitle="Diamond and Gold timers." />
+          <Card>
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Bid on Diamond and Gold auctions before timers expire. Upcoming bids will appear as a
+              simple list here.
+            </Text>
+          </Card>
+        </View>
+
+        <View style={{ gap: theme.spacing.md }}>
+          <SectionHeader
+            title="Ownership"
+            subtitle="OwnershipCard placeholder to recap your stakes."
+          />
+          <Card muted>
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Showcase owned passes, shares, or collectibles once they are available in-app.
+            </Text>
+          </Card>
+        </View>
+      </View>
+    </Screen>
   );
 }
-
-function Section({ title, children }: React.PropsWithChildren<{ title: string }>) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  heading: {
-    color: '#f5f5f5',
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  subheading: {
-    color: '#c5cad3',
-    marginVertical: 8,
-  },
-  balance: {
-    color: '#f7c948',
-    marginBottom: 12,
-    fontWeight: '700',
-  },
-  section: {
-    marginTop: 16,
-  },
-  sectionTitle: {
-    color: '#f5f5f5',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  body: {
-    color: '#9aa0aa',
-  },
-});

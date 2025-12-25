@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Switch, Text, TextInput, View } from 'react-native';
 
 import { useGoldStore } from '../../src/state/gold';
+import { Button, Card, Screen, SectionHeader, useTheme } from '../../src/ui';
 
 export default function SettingsTab() {
   const walletAddress = useGoldStore((state) => state.walletAddress);
@@ -12,6 +13,7 @@ export default function SettingsTab() {
   const [walletInput, setWalletInput] = useState(walletAddress ?? '');
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
+  const { theme } = useTheme();
 
   const walletSaved = useMemo(
     () => walletInput.trim().length > 0 && walletInput.trim() === (walletAddress ?? ''),
@@ -31,137 +33,106 @@ export default function SettingsTab() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.heading}>Settings</Text>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Web3 Login</Text>
-        <Text style={styles.body}>Placeholder for wallet connection and signing.</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Notifications</Text>
-        <Text style={styles.body}>Opt into Gold drops and auction reminders.</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Wallet</Text>
-        <Text style={styles.body}>Set a wallet address to unlock daily claims.</Text>
-        <TextInput
-          value={walletInput}
-          onChangeText={setWalletInput}
-          placeholder="0x..."
-          placeholderTextColor="#656b7b"
-          style={styles.input}
-          autoCapitalize="none"
-        />
-        <View style={styles.rowBetween}>
-          <Text style={styles.body}>
-            {walletAddress ? `Current: ${walletAddress}` : 'Not connected'}
+    <Screen>
+      <View style={{ gap: theme.spacing.lg }}>
+        <SectionHeader title="Settings" subtitle="UI-only placeholders" />
+
+        <Card muted>
+          <SectionHeader title="Web3 Login" subtitle="Wallet connection placeholder" />
+          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+            Placeholder for wallet connection and signing.
           </Text>
-          <Pressable
-            style={[styles.button, walletSaved && styles.buttonDisabled]}
-            onPress={handleSaveWallet}
-            disabled={walletSaved}
-          >
-            <Text style={[styles.buttonText, walletSaved && styles.buttonTextMuted]}>
-              {walletSaved ? 'Saved' : 'Save'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Economy API</Text>
-        <Text style={styles.body}>Use read-only snapshots from the API when available.</Text>
-        <View style={styles.rowBetween}>
-          <Text style={styles.body}>Use API snapshot (read-only)</Text>
-          <Switch
-            value={apiSyncEnabled}
-            onValueChange={setApiSyncEnabled}
-            thumbColor={apiSyncEnabled ? '#f7c948' : '#37374a'}
-            trackColor={{ false: '#1f1f2d', true: '#5c4900' }}
+        </Card>
+
+        <Card>
+          <SectionHeader title="Notifications" subtitle="Drops and auction reminders" />
+          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+            Opt into Gold drops and auction reminders.
+          </Text>
+        </Card>
+
+        <Card>
+          <SectionHeader title="Wallet" subtitle="Setup for daily claims" />
+          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+            Set a wallet address to unlock daily claims.
+          </Text>
+          <TextInput
+            value={walletInput}
+            onChangeText={setWalletInput}
+            placeholder="0x..."
+            placeholderTextColor={theme.colors.subdued}
+            style={{
+              backgroundColor: theme.colors.input,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radius.md,
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.sm,
+              marginTop: theme.spacing.sm,
+              color: theme.colors.text,
+            }}
+            autoCapitalize="none"
           />
-        </View>
-        <Pressable
-          style={[styles.button, styles.syncButton]}
-          onPress={handleSync}
-          disabled={!apiSyncEnabled || syncLoading}
-        >
-          <Text
-            style={[
-              styles.buttonText,
-              (!apiSyncEnabled || syncLoading) && styles.buttonTextMuted,
-            ]}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: theme.spacing.sm,
+              gap: theme.spacing.sm,
+            }}
           >
-            {syncLoading ? 'Syncing...' : 'Sync now'}
-          </Text>
-        </Pressable>
-        {syncStatus ? <Text style={styles.body}>{syncStatus}</Text> : null}
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              {walletAddress ? `Current: ${walletAddress}` : 'Not connected'}
+            </Text>
+            <Button
+              label={walletSaved ? 'Saved' : 'Save'}
+              onPress={handleSaveWallet}
+              disabled={walletSaved}
+              variant={walletSaved ? 'secondary' : 'primary'}
+              style={walletSaved ? { opacity: 0.7 } : undefined}
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <SectionHeader title="Economy API" subtitle="Read-only snapshot mode" />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: theme.spacing.md,
+            }}
+          >
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Use API snapshot (read-only)
+            </Text>
+            <Switch
+              value={apiSyncEnabled}
+              onValueChange={setApiSyncEnabled}
+              thumbColor={apiSyncEnabled ? theme.colors.primary : theme.colors.surfaceMuted}
+              trackColor={{
+                false: theme.colors.border,
+                true: theme.colors.primarySoft,
+              }}
+            />
+          </View>
+          <Button
+            label={syncLoading ? 'Syncing...' : 'Sync now'}
+            onPress={handleSync}
+            disabled={!apiSyncEnabled || syncLoading}
+            variant="secondary"
+            style={{ marginTop: theme.spacing.sm, alignSelf: 'flex-start' }}
+            textStyle={!apiSyncEnabled || syncLoading ? { color: theme.colors.subdued } : undefined}
+          />
+          {syncStatus ? (
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              {syncStatus}
+            </Text>
+          ) : null}
+        </Card>
       </View>
-    </ScrollView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  heading: {
-    color: '#f5f5f5',
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-  card: {
-    backgroundColor: '#15151f',
-    padding: 14,
-    borderRadius: 10,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#252537',
-  },
-  cardTitle: {
-    color: '#f5f5f5',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  body: {
-    color: '#c5cad3',
-    marginTop: 4,
-  },
-  input: {
-    backgroundColor: '#0b0b0f',
-    borderWidth: 1,
-    borderColor: '#252537',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-    color: '#f5f5f5',
-  },
-  button: {
-    backgroundColor: '#f7c948',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  buttonDisabled: {
-    backgroundColor: '#2a2a36',
-  },
-  buttonText: {
-    color: '#0b0b0f',
-    fontWeight: '700',
-  },
-  buttonTextMuted: {
-    color: '#8d93a3',
-  },
-  syncButton: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-  },
-});
