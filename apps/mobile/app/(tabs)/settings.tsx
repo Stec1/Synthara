@@ -2,8 +2,10 @@ import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Switch, Text, TextInput, View } from 'react-native';
 
+import { useDemoIdentity } from '../../src/hooks/useDemoIdentity';
+import { useDemoIdentityStore } from '../../src/state/demoIdentity';
 import { useGoldStore } from '../../src/state/gold';
-import { Button, Card, Screen, SectionHeader, useTheme } from '../../src/ui';
+import { Badge, Button, Card, Screen, SectionHeader, useTheme } from '../../src/ui';
 
 export default function SettingsTab() {
   const walletAddress = useGoldStore((state) => state.walletAddress);
@@ -13,6 +15,9 @@ export default function SettingsTab() {
   const inventoryApiEnabled = useGoldStore((state) => state.inventoryApiEnabled);
   const setInventoryApiEnabled = useGoldStore((state) => state.setInventoryApiEnabled);
   const syncFromApi = useGoldStore((state) => state.syncFromApi);
+  const { enabled: demoEnabled, userId: demoUserId, isCreator, isFan } = useDemoIdentity();
+  const setDemoRole = useDemoIdentityStore((state) => state.setRole);
+  const toggleDemoEnabled = useDemoIdentityStore((state) => state.toggleEnabled);
   const [walletInput, setWalletInput] = useState(walletAddress ?? '');
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
@@ -38,7 +43,17 @@ export default function SettingsTab() {
   return (
     <Screen>
       <View style={{ gap: theme.spacing.lg }}>
-        <SectionHeader title="Settings" subtitle="UI-only placeholders" />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: theme.spacing.md,
+          }}
+        >
+          <SectionHeader title="Settings" subtitle="UI-only placeholders" />
+          {demoEnabled ? <Badge label="Demo Mode" tone="warning" /> : null}
+        </View>
 
         <Card muted>
           <SectionHeader title="Web3 Login" subtitle="Wallet connection placeholder" />
@@ -51,6 +66,62 @@ export default function SettingsTab() {
           <SectionHeader title="Notifications" subtitle="Drops and auction reminders" />
           <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
             Opt into Gold drops and auction reminders.
+          </Text>
+        </Card>
+
+        <Card>
+          <SectionHeader title="Demo Identity" subtitle="Local-only identity for preview and demos." />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: theme.spacing.md,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Enable Demo Mode
+            </Text>
+            <Switch
+              value={demoEnabled}
+              onValueChange={toggleDemoEnabled}
+              thumbColor={demoEnabled ? theme.colors.primary : theme.colors.surfaceMuted}
+              trackColor={{
+                false: theme.colors.border,
+                true: theme.colors.primarySoft,
+              }}
+            />
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: theme.spacing.sm,
+              marginTop: theme.spacing.md,
+            }}
+          >
+            <Button
+              label="Fan"
+              onPress={() => setDemoRole('fan')}
+              variant={isFan ? 'primary' : 'secondary'}
+              disabled={!demoEnabled}
+              style={!demoEnabled ? { opacity: 0.6 } : undefined}
+            />
+            <Button
+              label="Creator"
+              onPress={() => setDemoRole('creator')}
+              variant={isCreator ? 'primary' : 'secondary'}
+              disabled={!demoEnabled}
+              style={!demoEnabled ? { opacity: 0.6 } : undefined}
+            />
+          </View>
+          <Text
+            style={[
+              theme.typography.caption,
+              { color: theme.colors.subdued, marginTop: theme.spacing.sm },
+            ]}
+          >
+            User ID: {demoUserId}
           </Text>
         </Card>
 
