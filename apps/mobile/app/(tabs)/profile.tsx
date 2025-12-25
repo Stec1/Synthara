@@ -1,9 +1,10 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 
 import { useModels, useStartEmailAuth, useVerifyEmail } from '../../src/api/hooks';
 import { GoldWalletCard } from '../../src/components/GoldWalletCard';
+import { DEMO_MODELS } from '../../src/data/demoModels';
 import { useAuthStore } from '../../src/state/auth';
 import { useGoldStore } from '../../src/state/gold';
 import { Badge, Button, Card, Divider, Screen, SectionHeader, useTheme } from '../../src/ui';
@@ -16,6 +17,7 @@ export default function ProfileTab() {
   const role = useGoldStore((state) => state.role);
   const { data: models = [] } = useModels();
   const { theme } = useTheme();
+  const router = useRouter();
 
   const handleLogin = async () => {
     await startEmail('demo@synthara.ai');
@@ -41,6 +43,34 @@ export default function ProfileTab() {
           <View style={{ flexDirection: 'row', gap: theme.spacing.md, flexWrap: 'wrap' }}>
             <Button label="Mock Email Login" onPress={handleLogin} />
             <Button label="Sign Out" variant="secondary" onPress={() => setToken(null)} />
+          </View>
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="Demo Models"
+            subtitle="Jump directly into the model passport story."
+          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            <Button
+              label="Open Ember Rayne Passport"
+              onPress={() =>
+                router.push({
+                  pathname: '/profile/model/[modelId]',
+                  params: { modelId: DEMO_MODELS[0].id },
+                })
+              }
+            />
+            <Button
+              label="Open Another Model Passport"
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/profile/model/[modelId]',
+                  params: { modelId: DEMO_MODELS[1]?.id ?? 'model-lyra-shift' },
+                })
+              }
+            />
           </View>
         </Card>
 

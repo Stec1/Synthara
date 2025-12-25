@@ -1,8 +1,10 @@
 import React from 'react';
 import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { useModels } from '../../src/api/hooks';
 import { ModelCard } from '../../src/components/ModelCard';
+import { DEMO_MODELS } from '../../src/data/demoModels';
 import {
   Badge,
   Card,
@@ -17,6 +19,7 @@ export default function HomeScreen() {
   const { data: models = [] } = useModels();
   const balance = useGoldStore((state) => state.balance);
   const { theme } = useTheme();
+  const router = useRouter();
 
   return (
     <Screen>
@@ -31,16 +34,34 @@ export default function HomeScreen() {
 
         <View style={{ gap: theme.spacing.md }}>
           <SectionHeader title="Trending Models" subtitle="Fresh talent from the creator vault." />
-          {models.length === 0 ? (
-            <Card muted>
-              <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
-                Models loading from the network.
-              </Text>
-            </Card>
-          ) : null}
-          {models.map((model) => (
-            <ModelCard key={model.id} model={model} />
-          ))}
+          {models.length > 0
+            ? models.map((model) => <ModelCard key={model.id} model={model} />)
+            : (
+              <View style={{ gap: theme.spacing.sm }}>
+                <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+                  Models are loading from the network. Explore the demo passports while you wait.
+                </Text>
+                {DEMO_MODELS.slice(0, 3).map((model) => (
+                  <Card
+                    key={model.id}
+                    onPress={() =>
+                      router.push({ pathname: '/profile/model/[modelId]', params: { modelId: model.id } })
+                    }
+                    style={{ gap: theme.spacing.xs }}
+                  >
+                    <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>
+                      {model.name}
+                    </Text>
+                    <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+                      {model.tagline}
+                    </Text>
+                    {model.badges.isFeatured ? (
+                      <Badge label="Featured" tone="primary" />
+                    ) : null}
+                  </Card>
+                ))}
+              </View>
+            )}
         </View>
 
         <View style={{ gap: theme.spacing.md }}>
