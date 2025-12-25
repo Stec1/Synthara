@@ -65,7 +65,7 @@ export default function GoldShopScreen() {
   const ownedPerks = useMemo(() => getOwnedPerks(), [getOwnedPerks, perkInventory]);
   const now = Date.now();
 
-  const handleBuy = (perk: Perk) => {
+  const handleBuy = (perk: PerkDefinition) => {
     if (perk.roleGate && perk.roleGate !== role) {
       setStatusMessage('This perk is gated to a different role');
       return;

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Switch, Text, TextInput, View } from 'react-native';
 
@@ -160,6 +161,13 @@ export default function SettingsTab() {
             </Text>
           ) : null}
         </Card>
+
+        {__DEV__ ? (
+          <Card>
+            <SectionHeader title="Developer" subtitle="Local analytics summary" />
+            <Button label="Open Analytics" onPress={() => router.push('/dev-analytics')} />
+          </Card>
+        ) : null}
       </View>
     </Screen>
   );

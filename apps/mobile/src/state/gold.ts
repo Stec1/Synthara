@@ -198,6 +198,7 @@ export interface GoldState extends GoldLimitsState {
   getActivePerkEffects: (now?: number) => RewardPerkEffect[];
   setApiSyncEnabled: (enabled: boolean) => void;
   setInventoryApiEnabled: (enabled: boolean) => void;
+  addRewardTicket: (ticket: RewardTicket) => void;
   syncFromApi: () => Promise<{ ok: boolean; reason?: string }>;
   resetIfNewDay: () => void;
 }
@@ -835,21 +836,20 @@ export const useGoldStore = create<GoldState>()(
           return { ok: false, error: 'Ticket expired' };
         }
 
-        if (ticket.reward.kind === 'GOLD_POINTS') {
-          get().earn(ticket.reward.amount, 'reward_ticket', 'Claimed reward ticket');
-        }
-        if (ticket.reward.kind === 'PERK_ITEM') {
-          const perk = state.perkCatalog.find((entry) => entry.id === ticket.reward.perkId);
+        const reward = ticket.reward;
+        if (reward.kind === 'GOLD_POINTS') {
+          get().earn(reward.amount, 'reward_ticket', 'Claimed reward ticket');
+        } else if (reward.kind === 'PERK_ITEM') {
+          const perk = state.perkCatalog.find((entry) => entry.id === reward.perkId);
           if (perk) {
             const newItem = createPerkInventoryItem(perk, 'REWARD_TICKET', now);
             set((current) => ({ perkInventory: [newItem, ...current.perkInventory] }));
           }
-        }
-        if (ticket.reward.kind === 'NFT_PLACEHOLDER') {
+        } else if (reward.kind === 'NFT_PLACEHOLDER') {
           get().mintMockNft({
-            tier: ticket.reward.tier,
+            tier: reward.tier,
             isPlaceholder: true,
-            name: ticket.reward.name,
+            name: reward.name,
           });
         }
 
@@ -1058,6 +1058,15 @@ export const useGoldStore = create<GoldState>()(
       },
       setApiSyncEnabled: (enabled) => set({ apiSyncEnabled: enabled }),
       setInventoryApiEnabled: (enabled) => set({ inventoryApiEnabled: enabled }),
+      addRewardTicket: (ticket) => {
+        set((state) => {
+          const existing = state.rewardTickets.find((item) => item.id === ticket.id);
+          const nextTickets = existing
+            ? state.rewardTickets.map((item) => (item.id === ticket.id ? { ...item, ...ticket } : item))
+            : [ticket, ...state.rewardTickets];
+          return { rewardTickets: nextTickets };
+        });
+      },
       syncFromApi: async () => {
         const state = get();
         if (!state.apiSyncEnabled && !state.inventoryApiEnabled) {

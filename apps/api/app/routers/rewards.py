@@ -103,6 +103,16 @@ def get_tickets(user_id: str = FAKE_USER_ID) -> List[RewardTicketDTO]:
     return _TICKETS[user_id]
 
 
+def add_ticket(ticket: RewardTicketDTO, user_id: str = FAKE_USER_ID) -> RewardTicketDTO:
+    tickets = get_tickets(user_id)
+    existing = next((item for item in tickets if item.id == ticket.id), None)
+    if existing:
+        return existing
+    tickets.insert(0, ticket)
+    _TICKETS[user_id] = tickets
+    return ticket
+
+
 @router.get("/tickets/me", response_model=List[RewardTicketDTO])
 def list_my_tickets() -> List[RewardTicketDTO]:
     return get_tickets()
