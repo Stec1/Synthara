@@ -14,6 +14,7 @@ from .dependencies import get_current_user, get_db_session
 from .routers import economy as economy_router
 from .routers import entitlements as entitlements_router
 from .routers import events as events_router
+from .routers import game_preview as game_preview_router
 from .routers import models as models_router
 from .routers import rewards as rewards_router
 from .schemas import AuthStartRequest, AuthStartResponse, AuthVerifyRequest, AuthVerifyResponse, UserRead
@@ -72,6 +73,7 @@ app.include_router(economy_router.read_router)
 app.include_router(entitlements_router.router)
 app.include_router(events_router.router)
 app.include_router(rewards_router.router)
+app.include_router(game_preview_router.router)
 
 
 def _get_or_seed_games(session: Session) -> list[models.GameEvent]:

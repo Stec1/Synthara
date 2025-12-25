@@ -70,6 +70,22 @@ export interface RewardTicketDTO {
     | { kind: 'NFT_PLACEHOLDER'; name: string; tier?: 'silver' | 'gold' | 'diamond' };
 }
 
+export type GameMatchResultDTO = {
+  matchId: string;
+  modelId: string;
+  outcome: 'WIN' | 'LOSS' | 'DRAW';
+  rewardTicket?: RewardTicketDTO;
+};
+
+export type RewardGenerationRuleDTO = {
+  source: 'GAME_MATCH';
+  outcome: 'WIN' | 'LOSS' | 'DRAW';
+  reward:
+    | { kind: 'GOLD_POINTS'; amount: number }
+    | { kind: 'PERK_ITEM'; perkId: string }
+    | { kind: 'NFT_PLACEHOLDER'; tier?: 'silver' | 'gold' | 'diamond' };
+};
+
 export interface EarningLogItemDTO {
   id: string;
   type: string;

@@ -31,5 +31,8 @@ export const getInventoryMe = () => api.get('/inventory/me');
 export const getEntitlements = () => api.get('/entitlements/me');
 export const postEventLog = (payload: { eventType: string; metadata?: Record<string, unknown> }) =>
   api.post('/events/log', payload);
+export const startGamePreviewMatch = () => api.post('/game/preview/start');
+export const finishGamePreviewMatch = (payload: { matchId: string; outcome: string; modelId: string }) =>
+  api.post('/game/preview/finish', payload);
 
 export default api;

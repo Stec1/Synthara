@@ -18,6 +18,7 @@ function ThemedStack() {
       <Stack.Screen name="gold-shop" options={{ title: 'Gold Shop', ...headerOptions }} />
       <Stack.Screen name="nft-inventory" options={{ title: 'NFT Inventory', ...headerOptions }} />
       <Stack.Screen name="profile/model" options={{ title: 'Model Profile', ...headerOptions }} />
+      <Stack.Screen name="dev-analytics" options={{ title: 'Dev Analytics', ...headerOptions }} />
     </Stack>
   );
 }
