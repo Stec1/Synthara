@@ -93,10 +93,18 @@ _ECONOMY_STATE: Dict[str, Dict[str, object]] = {}
 def get_snapshot(user_id: str = FAKE_USER_ID) -> Dict[str, object]:
     snapshot = _ECONOMY_STATE.setdefault(
         user_id,
-        {"balance": 500, "ownedPerks": {}, "inventory": []},
+        {
+            "balance": 500,
+            "ownedPerks": {},
+            "inventory": [],
+            "perkInventory": [],
+            "goldPass": {"active": True, "expiresAt": None},
+        },
     )
     snapshot.setdefault("ownedPerks", {})
     snapshot.setdefault("inventory", [])
+    snapshot.setdefault("perkInventory", [])
+    snapshot.setdefault("goldPass", {"active": False, "expiresAt": None})
     return snapshot
 
 
@@ -165,10 +173,3 @@ def get_my_inventory() -> List[NftInventoryItemDTO]:
     snapshot = get_snapshot()
     inventory: List[Dict[str, object]] = snapshot["inventory"]  # type: ignore[assignment]
     return [NftInventoryItemDTO(**item) for item in inventory]
-
-
-@read_router.get("/entitlements/me", response_model=Dict[str, bool])
-def get_my_entitlements() -> Dict[str, bool]:
-    snapshot = get_snapshot()
-    owned_perks: Dict[str, bool] = snapshot["ownedPerks"]  # type: ignore[assignment]
-    return owned_perks

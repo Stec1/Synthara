@@ -131,3 +131,23 @@ export interface ClaimRewardTicketResponseDTO {
   goldDelta?: number;
   error?: string;
 }
+
+export type EntitlementKey =
+  | 'CAN_CLAIM_DAILY_GOLD'
+  | 'CAN_USE_EARNING_ACTIONS'
+  | 'HAS_ACTIVE_GOLD_PASS'
+  | 'CAN_ACCESS_GAME_ROOM'
+  | 'CAN_CLAIM_REWARD_TICKET'
+  | 'CAN_VIEW_LORA_PASSPORT';
+
+export interface UserEntitlementDTO {
+  key: EntitlementKey;
+  value: boolean;
+  source?: 'PERK' | 'NFT' | 'SYSTEM';
+  expiresAt?: string;
+}
+
+export interface UserEntitlementsDTO {
+  updatedAt: string;
+  entitlements: UserEntitlementDTO[];
+}

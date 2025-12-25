@@ -3,12 +3,16 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { useModelDetail } from '../../src/api/hooks';
+import { useEntitlementsStore } from '../../src/state/entitlements';
 import { Badge, Button, Card, Screen, SectionHeader, useTheme } from '../../src/ui';
 
 export default function ModelProfileScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const modelId = Number(params.id);
   const { data } = useModelDetail(Number.isNaN(modelId) ? undefined : modelId);
+  const canViewLoraPassport = useEntitlementsStore(
+    (state) => state.entitlements.CAN_VIEW_LORA_PASSPORT ?? false,
+  );
   const { theme } = useTheme();
 
   if (!modelId) {
@@ -42,30 +46,42 @@ export default function ModelProfileScreen() {
           </View>
         </View>
 
-        <View style={{ gap: theme.spacing.md }}>
-          <SectionHeader
-            title="LoRA Vault"
-            subtitle="Wireframe list of model-owned LoRAs."
-          />
-          {data?.loras?.length ? (
-            data.loras.map((lora) => (
-              <Card key={lora.id}>
-                <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>
-                  {lora.version}
-                </Text>
+        {canViewLoraPassport ? (
+          <View style={{ gap: theme.spacing.md }}>
+            <SectionHeader
+              title="LoRA Vault"
+              subtitle="Wireframe list of model-owned LoRAs."
+            />
+            {data?.loras?.length ? (
+              data.loras.map((lora) => (
+                <Card key={lora.id}>
+                  <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>
+                    {lora.version}
+                  </Text>
+                  <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+                    {lora.passport_metadata}
+                  </Text>
+                </Card>
+              ))
+            ) : (
+              <Card muted>
                 <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
-                  {lora.passport_metadata}
+                  No assets yet.
                 </Text>
               </Card>
-            ))
-          ) : (
-            <Card muted>
-              <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
-                No assets yet.
-              </Text>
-            </Card>
-          )}
-        </View>
+            )}
+          </View>
+        ) : (
+          <Card muted>
+            <SectionHeader
+              title="LoRA Passport"
+              subtitle="Visible when your entitlement is active."
+            />
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Unlock LoRA passport access to browse creator assets.
+            </Text>
+          </Card>
+        )}
 
         <View style={{ gap: theme.spacing.md }}>
           <SectionHeader

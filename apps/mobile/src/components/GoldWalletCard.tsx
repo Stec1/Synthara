@@ -10,6 +10,7 @@ import {
   useGoldStore,
   UserRole,
 } from '../state/gold';
+import { useEntitlementsStore } from '../state/entitlements';
 import { calculateGoldPoints } from '../domain/rewardEngine';
 import { Card, Divider, Theme, useTheme } from '../ui';
 
@@ -46,6 +47,9 @@ export function GoldWalletCard() {
   const performEarningAction = useGoldStore((state) => state.performEarningAction);
   const canUseAction = useGoldStore((state) => state.canUseAction);
   const unlockGoldPass = useGoldStore((state) => state.unlockGoldPass);
+  const canClaimDailyEntitlement = useEntitlementsStore(
+    (state) => state.entitlements.CAN_CLAIM_DAILY_GOLD ?? false,
+  );
 
   const perkEffects = useMemo(
     () => getPerkEffectsForOwned(perkInventory, perkCatalog),
@@ -71,10 +75,13 @@ export function GoldWalletCard() {
     () => calcDailyClaimAmount(25, perkEffects, nextStreak, 0),
     [nextStreak, perkEffects],
   );
-  const claimBlocked = !dailyClaimAvailability.ok;
-  const claimHint = claimBlocked && dailyClaimAvailability.remainingMs !== undefined
-    ? `Claim available in ${formatRemaining(dailyClaimAvailability.remainingMs)}`
-    : 'Claim once every 24h (UTC)';
+  const claimBlocked = !canClaimDailyEntitlement || !dailyClaimAvailability.ok;
+  const claimHint =
+    !canClaimDailyEntitlement && walletAddress
+      ? 'Daily claim locked. Missing entitlement.'
+      : claimBlocked && dailyClaimAvailability.remainingMs !== undefined
+      ? `Claim available in ${formatRemaining(dailyClaimAvailability.remainingMs)}`
+      : 'Claim once every 24h (UTC)';
   const boostsChips = useMemo(() => {
     const chips: string[] = [];
     if (activeBoosts.dailyClaimMultiplier !== 1) {
