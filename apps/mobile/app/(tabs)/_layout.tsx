@@ -1,12 +1,18 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 
+import { useEntitlementsStore } from '../../src/state/entitlements';
 import { useTheme } from '../../src/ui';
 
 export default function TabsLayout() {
+  const syncEntitlements = useEntitlementsStore((state) => state.syncEntitlementsFromApi);
   const { theme, colorScheme } = useTheme();
+
+  useEffect(() => {
+    syncEntitlements();
+  }, [syncEntitlements]);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>

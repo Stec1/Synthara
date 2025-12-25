@@ -9,6 +9,8 @@ export default function SettingsTab() {
   const setWalletAddress = useGoldStore((state) => state.setWalletAddress);
   const apiSyncEnabled = useGoldStore((state) => state.apiSyncEnabled);
   const setApiSyncEnabled = useGoldStore((state) => state.setApiSyncEnabled);
+  const inventoryApiEnabled = useGoldStore((state) => state.inventoryApiEnabled);
+  const setInventoryApiEnabled = useGoldStore((state) => state.setInventoryApiEnabled);
   const syncFromApi = useGoldStore((state) => state.syncFromApi);
   const [walletInput, setWalletInput] = useState(walletAddress ?? '');
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
@@ -118,13 +120,39 @@ export default function SettingsTab() {
               }}
             />
           </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: theme.spacing.md,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
+              Sync inventory from API
+            </Text>
+            <Switch
+              value={inventoryApiEnabled}
+              onValueChange={setInventoryApiEnabled}
+              thumbColor={inventoryApiEnabled ? theme.colors.primary : theme.colors.surfaceMuted}
+              trackColor={{
+                false: theme.colors.border,
+                true: theme.colors.primarySoft,
+              }}
+            />
+          </View>
           <Button
             label={syncLoading ? 'Syncing...' : 'Sync now'}
             onPress={handleSync}
-            disabled={!apiSyncEnabled || syncLoading}
+            disabled={(!apiSyncEnabled && !inventoryApiEnabled) || syncLoading}
             variant="secondary"
             style={{ marginTop: theme.spacing.sm, alignSelf: 'flex-start' }}
-            textStyle={!apiSyncEnabled || syncLoading ? { color: theme.colors.subdued } : undefined}
+            textStyle={
+              (!apiSyncEnabled && !inventoryApiEnabled) || syncLoading
+                ? { color: theme.colors.subdued }
+                : undefined
+            }
           />
           {syncStatus ? (
             <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>

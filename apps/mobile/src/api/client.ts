@@ -27,5 +27,9 @@ api.interceptors.request.use((config) => {
 });
 
 export const getEconomyMe = () => api.get('/economy/me');
+export const getInventoryMe = () => api.get('/inventory/me');
+export const getEntitlements = () => api.get('/entitlements/me');
+export const postEventLog = (payload: { eventType: string; metadata?: Record<string, unknown> }) =>
+  api.post('/events/log', payload);
 
 export default api;

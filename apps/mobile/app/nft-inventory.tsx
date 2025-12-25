@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { InventoryNft, isPerkItemActive, useGoldStore } from '../src/state/gold';
+import { useEntitlementsStore } from '../src/state/entitlements';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
 const formatPerkInventoryLabel = (item: InventoryNft) =>
@@ -16,6 +17,9 @@ export default function NftInventoryScreen() {
   const mintMockNft = useGoldStore((state) => state.mintMockNft);
   const [lastMinted, setLastMinted] = useState<InventoryNft | null>(null);
   const [ticketStatus, setTicketStatus] = useState<string | null>(null);
+  const canClaimRewardTicket = useEntitlementsStore(
+    (state) => state.entitlements.CAN_CLAIM_REWARD_TICKET ?? false,
+  );
 
   const perkTitleMap = useMemo(
     () =>
@@ -116,7 +120,7 @@ export default function NftInventoryScreen() {
                 {ticket.expiresAt ? (
                   <Text style={styles.body}>Expires: {formatDateTime(ticket.expiresAt)}</Text>
                 ) : null}
-                {ticket.status === 'PENDING' ? (
+                {ticket.status === 'PENDING' && canClaimRewardTicket ? (
                   <Pressable style={styles.primaryButton} onPress={() => handleClaimTicket(ticket.id)}>
                     <Text style={styles.primaryButtonText}>Claim</Text>
                   </Pressable>

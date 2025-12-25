@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { getEconomyMe } from '../api/client';
+import { getEconomyMe, getInventoryMe } from '../api/client';
+import { logEvent } from '../api/events';
 import { RewardActionId, RewardPerkEffect, RewardPerkEffectType, calculateGoldPoints } from '../domain/rewardEngine';
 
 export type UserRole = 'fan' | 'creator' | 'admin';
@@ -172,6 +173,7 @@ export interface GoldState extends GoldLimitsState {
   viewedModelsToday: ModelActionTracker;
   sharedModelsToday: ModelActionTracker;
   apiSyncEnabled: boolean;
+  inventoryApiEnabled: boolean;
   setRole: (role: UserRole) => void;
   earn: (amount: number, reason: GoldReason, note?: string) => void;
   spend: (amount: number, reason: GoldReason, note?: string) => boolean;
@@ -195,6 +197,7 @@ export interface GoldState extends GoldLimitsState {
   getOwnedPerks: () => Record<PerkId, boolean>;
   getActivePerkEffects: (now?: number) => RewardPerkEffect[];
   setApiSyncEnabled: (enabled: boolean) => void;
+  setInventoryApiEnabled: (enabled: boolean) => void;
   syncFromApi: () => Promise<{ ok: boolean; reason?: string }>;
   resetIfNewDay: () => void;
 }
@@ -708,20 +711,24 @@ export const useGoldStore = create<GoldState>()(
       viewedModelsToday: { dayKeyUTC: getUtcDayKey(), modelIds: [] },
       sharedModelsToday: { dayKeyUTC: getUtcDayKey(), modelIds: [] },
       apiSyncEnabled: false,
+      inventoryApiEnabled: false,
       setRole: (role) => {
         set({ role });
         get().recomputeBoosts();
       },
-      earn: (amount, reason, note) =>
+      earn: (amount, reason, note) => {
+        void logEvent('GOLD_EARNED', { amount, reason, note });
         set((state) => ({
           balance: state.balance + amount,
           transactions: [createTransaction('earn', amount, reason, note), ...state.transactions],
-        })),
+        }));
+      },
       spend: (amount, reason, note) => {
         const state = get();
         if (state.balance < amount) {
           return false;
         }
+        void logEvent('GOLD_SPENT', { amount, reason, note });
         set({
           balance: state.balance - amount,
           transactions: [createTransaction('spend', amount, reason, note), ...state.transactions],
@@ -786,6 +793,7 @@ export const useGoldStore = create<GoldState>()(
         }
 
         const newItem = createPerkInventoryItem(perk, 'SHOP_PURCHASE', now);
+        void logEvent('PERK_PURCHASED', { perkId, price: perk.priceGold });
         set((current) => ({
           perkInventory: [newItem, ...current.perkInventory],
         }));
@@ -850,6 +858,7 @@ export const useGoldStore = create<GoldState>()(
             t.id === ticketId ? { ...t, status: 'CLAIMED' } : t,
           ),
         }));
+        void logEvent('REWARD_CLAIMED', { ticketId, reward: ticket.reward.kind });
         get().recomputeBoosts();
         return { ok: true };
       },
@@ -1048,14 +1057,19 @@ export const useGoldStore = create<GoldState>()(
         return getPerkEffectsForOwned(state.perkInventory, state.perkCatalog, now ?? Date.now());
       },
       setApiSyncEnabled: (enabled) => set({ apiSyncEnabled: enabled }),
+      setInventoryApiEnabled: (enabled) => set({ inventoryApiEnabled: enabled }),
       syncFromApi: async () => {
         const state = get();
-        if (!state.apiSyncEnabled) {
+        if (!state.apiSyncEnabled && !state.inventoryApiEnabled) {
           return { ok: false, reason: 'API sync disabled' };
         }
         try {
-          const response = await getEconomyMe();
-          const data = response.data ?? {};
+          const [economyResponse, inventoryResponse] = await Promise.all([
+            state.apiSyncEnabled ? getEconomyMe() : null,
+            state.inventoryApiEnabled ? getInventoryMe() : null,
+          ]);
+          const data = economyResponse?.data ?? {};
+          const apiInventory = inventoryResponse?.data as InventoryNft[] | undefined;
           const incomingActions = Array.isArray(data.earningActions)
             ? data.earningActions
             : Array.isArray(data.actions)
@@ -1083,11 +1097,29 @@ export const useGoldStore = create<GoldState>()(
                     nextOwnedPerks ??
                       (current as unknown as { ownedPerks?: Record<PerkId, boolean> }).ownedPerks,
                   );
+            const baseInventory = Array.isArray(data.inventory)
+              ? (data.inventory as InventoryNft[])
+              : current.inventory;
+            const mergedWithLocal = [
+              ...current.inventory,
+              ...baseInventory.filter(
+                (item) => !current.inventory.some((existing) => existing.id === item.id),
+              ),
+            ];
+            const mergedInventory =
+              apiInventory && apiInventory.length > 0
+                ? [
+                    ...mergedWithLocal,
+                    ...apiInventory.filter(
+                      (item) => !mergedWithLocal.some((existing) => existing.id === item.id),
+                    ),
+                  ]
+                : mergedWithLocal;
             return {
               balance: typeof data.balance === 'number' ? data.balance : current.balance,
               perkInventory: migratedPerks,
-              inventory: Array.isArray(data.inventory) ? data.inventory : current.inventory,
-              nfts: Array.isArray(data.inventory) ? data.inventory : current.nfts,
+              inventory: mergedInventory,
+              nfts: mergedInventory,
               rewardTickets: rewardTickets ?? current.rewardTickets,
               walletAddress:
                 data.walletAddress !== undefined ? (data.walletAddress as string | null) : current.walletAddress,
@@ -1163,6 +1195,7 @@ export const useGoldStore = create<GoldState>()(
           }
           state.rewardTickets = state.rewardTickets ?? createMockRewardTickets();
           state.perkCatalog = state.perkCatalog ?? PERK_CATALOG;
+          state.inventoryApiEnabled = state.inventoryApiEnabled ?? false;
           state.recomputeBoosts?.();
         }
       },
