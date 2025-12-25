@@ -2,6 +2,7 @@ import { EntitlementKey } from '@synthara/shared';
 import { create } from 'zustand';
 
 import { getEntitlements } from '../api/client';
+import { useDemoIdentityStore } from './demoIdentity';
 import { isPerkItemActive, useGoldStore } from './gold';
 
 type EntitlementMap = Record<EntitlementKey, boolean>;
@@ -41,6 +42,11 @@ const deriveLocalEntitlements = (): { entitlements: EntitlementMap; updatedAt: s
   entitlements.CAN_CLAIM_REWARD_TICKET = state.rewardTickets.some((ticket) => ticket.status === 'PENDING');
   entitlements.CAN_ACCESS_GAME_ROOM = hasGoldPass;
   entitlements.CAN_VIEW_LORA_PASSPORT = hasGoldPass;
+
+  const demoIdentity = useDemoIdentityStore.getState();
+  if (demoIdentity.enabled && demoIdentity.role === 'creator') {
+    entitlements.CAN_VIEW_LORA_PASSPORT = true;
+  }
 
   return { entitlements, updatedAt: new Date().toISOString() };
 };
@@ -89,5 +95,9 @@ export const useEntitlementsStore = create<EntitlementsState>((set, get) => ({
 }));
 
 useGoldStore.subscribe(() => {
+  useEntitlementsStore.getState().refreshFromLocal();
+});
+
+useDemoIdentityStore.subscribe(() => {
   useEntitlementsStore.getState().refreshFromLocal();
 });
