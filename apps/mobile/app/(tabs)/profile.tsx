@@ -1,116 +1,94 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { Link, useRouter } from 'expo-router';
 
-import { useModels, useStartEmailAuth, useVerifyEmail } from '../../src/api/hooks';
 import { GoldWalletCard } from '../../src/components/GoldWalletCard';
-import { DEMO_MODELS } from '../../src/data/demoModels';
-import { useAuthStore } from '../../src/state/auth';
+import { AccessChipRow } from '../../src/components/profileDashboard/AccessChipRow';
+import { ActivitySummaryCard } from '../../src/components/profileDashboard/ActivitySummaryCard';
+import { DashboardSection } from '../../src/components/profileDashboard/DashboardSection';
+import { MiniModelCard } from '../../src/components/profileDashboard/MiniModelCard';
+import { NftTierCard } from '../../src/components/profileDashboard/NftTierCard';
+import { getDemoAssetsForUser } from '../../src/data/demoUserAssets';
+import { useDemoIdentityStore } from '../../src/state/demoIdentity';
 import { useGoldStore } from '../../src/state/gold';
-import { Badge, Button, Card, Divider, Screen, SectionHeader, useTheme } from '../../src/ui';
+import { Badge, Card, Screen, useTheme } from '../../src/ui';
 
 export default function ProfileTab() {
-  const token = useAuthStore((state) => state.token);
-  const setToken = useAuthStore((state) => state.setToken);
-  const { mutateAsync: startEmail } = useStartEmailAuth();
-  const { mutateAsync: verifyEmail } = useVerifyEmail();
-  const role = useGoldStore((state) => state.role);
-  const { data: models = [] } = useModels();
   const { theme } = useTheme();
-  const router = useRouter();
+  const role = useGoldStore((state) => state.role);
+  const balance = useGoldStore((state) => state.balance);
+  const demoIdentity = useDemoIdentityStore();
 
-  const handleLogin = async () => {
-    await startEmail('demo@synthara.ai');
-    const { token: receivedToken } = await verifyEmail();
-    setToken(receivedToken);
-  };
+  const assets = useMemo(() => getDemoAssetsForUser(demoIdentity.userId), [demoIdentity.userId]);
+  const diamondNfts = assets.nfts.filter((item) => item.tier === 'diamond');
+  const goldNfts = assets.nfts.filter((item) => item.tier === 'gold');
 
   return (
     <Screen>
       <View style={{ gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.xs }}>
           <Text style={[theme.typography.title, { color: theme.colors.text }]}>My Profile</Text>
-          <Badge label={`Role: ${role ?? 'creator'}`} tone="primary" />
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Badge label={`Role: ${role ?? 'fan'}`} tone="primary" />
+            {demoIdentity.enabled ? <Badge label="Demo mode" tone="secondary" /> : null}
+            <Badge label={`Gold: ${balance}`} tone="info" />
+          </View>
         </View>
 
-        <GoldWalletCard />
-
-        <Card>
-          <SectionHeader title="Authentication" subtitle="Mock email login flow" />
-          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
-            Auth token: {token ?? 'not signed in'}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.md, flexWrap: 'wrap' }}>
-            <Button label="Mock Email Login" onPress={handleLogin} />
-            <Button label="Sign Out" variant="secondary" onPress={() => setToken(null)} />
-          </View>
-        </Card>
-
-        <Card>
-          <SectionHeader
-            title="Demo Models"
-            subtitle="Jump directly into the model passport story."
-          />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-            <Button
-              label="Open Ember Rayne Passport"
-              onPress={() =>
-                router.push({
-                  pathname: '/profile/model/[modelId]',
-                  params: { modelId: DEMO_MODELS[0].id },
-                })
-              }
-            />
-            <Button
-              label="Open Another Model Passport"
-              variant="secondary"
-              onPress={() =>
-                router.push({
-                  pathname: '/profile/model/[modelId]',
-                  params: { modelId: DEMO_MODELS[1]?.id ?? 'model-lyra-shift' },
-                })
-              }
-            />
-          </View>
-        </Card>
-
-        <View style={{ gap: theme.spacing.md }}>
-          <SectionHeader
-            title="Saved Models"
-            subtitle="Recently viewed and bookmarked creators."
-          />
-          {models.slice(0, 3).map((model) => (
-            <Link
-              key={model.id}
-              href={{ pathname: '/profile/model', params: { id: String(model.id) } }}
-              asChild
-            >
-              <Card muted>
-                <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>
-                  {model.name}
-                </Text>
-                <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
-                  {model.tagline}
-                </Text>
-              </Card>
-            </Link>
+        <DashboardSection
+          title="My Models"
+          subtitle="Ownership and follows that open a passport."
+        >
+          {assets.models.map((item) => (
+            <MiniModelCard key={`${item.modelId}-${item.relation}`} modelId={item.modelId} relation={item.relation} />
           ))}
-        </View>
+        </DashboardSection>
 
-        <Card muted>
-          <SectionHeader
-            title="Ownership"
-            subtitle="OwnershipCard placeholder to summarize your stakes."
-          />
-          <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>
-            Wallet-linked ownership recaps and perks will render here. No business logic is wired in
-            yet.
-          </Text>
-          <Divider />
-          <Text style={[theme.typography.caption, { color: theme.colors.subdued }]}>
-            Placeholder only. Connectors and balances remain mocked.
-          </Text>
-        </Card>
+        <DashboardSection title="My NFTs" subtitle="Diamond first, then your gold series.">
+          {diamondNfts.length === 0 && goldNfts.length === 0 ? (
+            <Card muted>
+              <Text style={[theme.typography.body, { color: theme.colors.subdued }]}>No NFTs yet. Mint or claim to see them here.</Text>
+            </Card>
+          ) : (
+            <View style={{ gap: theme.spacing.md }}>
+              {diamondNfts.length > 0 ? (
+                <View style={{ gap: theme.spacing.sm }}>
+                  <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>Diamond</Text>
+                  <View style={{ gap: theme.spacing.sm }}>
+                    {diamondNfts.map((item) => (
+                      <NftTierCard key={item.id} item={item} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {goldNfts.length > 0 ? (
+                <View style={{ gap: theme.spacing.sm }}>
+                  <Text style={[theme.typography.subtitle, { color: theme.colors.text }]}>Gold Series</Text>
+                  <View style={{ gap: theme.spacing.sm }}>
+                    {goldNfts.map((item) => (
+                      <NftTierCard key={item.id} item={item} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          )}
+        </DashboardSection>
+
+        <DashboardSection
+          title="My Access"
+          subtitle="Access updates after claims and perks."
+        >
+          <AccessChipRow />
+        </DashboardSection>
+
+        <DashboardSection title="Activity Summary">
+          <ActivitySummaryCard />
+        </DashboardSection>
+
+        <DashboardSection title="Gold Economy">
+          <GoldWalletCard />
+        </DashboardSection>
       </View>
     </Screen>
   );
