@@ -12,6 +12,8 @@ export type DemoUserNftItem = {
   label: string;
   status: 'owned' | 'listed' | 'locked';
   acquiredAtISO?: string;
+  source?: 'mint_mock' | 'demo' | 'reward';
+  createdByUserId?: string;
 };
 
 type DemoAssets = {
@@ -33,6 +35,8 @@ const KNOWN_USERS: Record<string, DemoAssets> = {
         label: 'Diamond 1/1',
         status: 'owned',
         acquiredAtISO: '2024-05-12T10:00:00.000Z',
+        source: 'demo',
+        createdByUserId: 'demo-user-001',
       },
       {
         id: 'asset-lyra-gold-14',
@@ -41,6 +45,8 @@ const KNOWN_USERS: Record<string, DemoAssets> = {
         label: 'Gold #14',
         status: 'listed',
         acquiredAtISO: '2024-06-02T15:00:00.000Z',
+        source: 'demo',
+        createdByUserId: 'demo-user-001',
       },
       {
         id: 'asset-lyra-gold-21',
@@ -48,6 +54,8 @@ const KNOWN_USERS: Record<string, DemoAssets> = {
         tier: 'gold',
         label: 'Gold #21',
         status: 'locked',
+        source: 'demo',
+        createdByUserId: 'demo-user-001',
       },
     ],
   },
@@ -85,6 +93,8 @@ const createGeneratedAssets = (userId: string): DemoAssets => {
       label: 'Diamond 1/1',
       status: 'owned',
       acquiredAtISO: deriveIsoFromOffset(checksum, 1),
+      source: 'demo',
+      createdByUserId: userId,
     },
     {
       id: `demo-nft-${userId}-g`,
@@ -93,15 +103,25 @@ const createGeneratedAssets = (userId: string): DemoAssets => {
       label: `Gold #${(checksum % 50) + 1}`,
       status: (checksum % 2 === 0 ? 'listed' : 'locked') as DemoUserNftItem['status'],
       acquiredAtISO: deriveIsoFromOffset(checksum, 5),
+      source: 'demo',
+      createdByUserId: userId,
     },
   ];
 
   return { models, nfts };
 };
 
-export const getDemoAssetsForUser = (userId: string): DemoAssets => {
+export const getDemoAssetsForUser = (userId: string, localNfts: DemoUserNftItem[] = []): DemoAssets => {
   if (KNOWN_USERS[userId]) {
-    return KNOWN_USERS[userId];
+    const base = KNOWN_USERS[userId];
+    return {
+      models: base.models,
+      nfts: [...localNfts.filter((item) => item.createdByUserId === userId), ...base.nfts],
+    };
   }
-  return createGeneratedAssets(userId);
+  const generated = createGeneratedAssets(userId);
+  return {
+    models: generated.models,
+    nfts: [...localNfts.filter((item) => item.createdByUserId === userId), ...generated.nfts],
+  };
 };

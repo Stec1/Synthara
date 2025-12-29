@@ -8,7 +8,8 @@ export type EventType =
   | 'REWARD_CLAIMED'
   | 'GAME_MATCH_STARTED'
   | 'GAME_MATCH_FINISHED'
-  | 'REWARD_TICKET_CREATED';
+  | 'REWARD_TICKET_CREATED'
+  | 'NFT_MINTED';
 
 export const logEvent = async (eventType: EventType, metadata?: Record<string, unknown>) => {
   useEventLogStore.getState().logLocalEvent(eventType, metadata);
