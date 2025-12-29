@@ -1,11 +1,18 @@
 import React from 'react';
 import { Image, Text, View } from 'react-native';
 
-import { DemoModel } from '../../data/demoModels';
 import { Badge, Card, useTheme } from '../../ui';
 
+type PassportHeroModel = {
+  id: string;
+  name: string;
+  tagline: string;
+  heroImage?: string;
+  badgeLabel?: string;
+};
+
 type PassportHeroProps = {
-  model: DemoModel;
+  model: PassportHeroModel;
 };
 
 export function PassportHero({ model }: PassportHeroProps) {
@@ -73,7 +80,7 @@ export function PassportHero({ model }: PassportHeroProps) {
   return (
     <View style={{ gap: theme.spacing.md }}>
       <View style={{ gap: theme.spacing.sm }}>
-        <Badge label={`Model ID: ${model.id}`} tone="primary" />
+        <Badge label={model.badgeLabel ?? `Model ID: ${model.id}`} tone="primary" />
         <Text style={[theme.typography.title, { color: theme.colors.text }]}>{model.name}</Text>
         <Text style={[theme.typography.subtitle, { color: theme.colors.subdued }]}>
           {model.tagline}

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { getDemoModelById } from '../../data/demoModels';
+import { useModelRegistryStore } from '../../state/modelRegistry';
 import { Theme, useTheme } from '../../ui';
 
 type MiniModelCardProps = {
@@ -13,8 +14,12 @@ type MiniModelCardProps = {
 export function MiniModelCard({ modelId, relation }: MiniModelCardProps) {
   const { theme } = useTheme();
   const router = useRouter();
+  const registeredModel = useModelRegistryStore((state) => state.getModelById(modelId));
   const model = getDemoModelById(modelId);
-  if (!model) return null;
+  const title = registeredModel?.displayName ?? model?.name;
+  const subtitle = registeredModel?.bio ?? model?.tagline;
+
+  if (!title || !subtitle) return null;
 
   const styles = createStyles(theme);
   const relationLabel = relation === 'owned' ? 'Owned' : 'Following';
@@ -22,7 +27,7 @@ export function MiniModelCard({ modelId, relation }: MiniModelCardProps) {
   return (
     <Pressable
       onPress={() =>
-        router.push({ pathname: '/profile/model/[modelId]', params: { modelId: model.id } })
+        router.push({ pathname: '/profile/model/[modelId]', params: { modelId } })
       }
       style={styles.card}
     >
@@ -30,9 +35,9 @@ export function MiniModelCard({ modelId, relation }: MiniModelCardProps) {
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{relationLabel}</Text>
         </View>
-        <Text style={styles.title}>{model.name}</Text>
+        <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle} numberOfLines={2}>
-          {model.tagline}
+          {subtitle}
         </Text>
       </View>
       <View style={styles.affordance}>

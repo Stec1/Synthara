@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { DEMO_MODELS, getDemoModelById } from '../../data/demoModels';
 import { DemoUserNftItem } from '../../data/demoUserAssets';
+import { useModelRegistryStore } from '../../state/modelRegistry';
 import { Theme, useTheme } from '../../ui';
 
 type NftTierCardProps = {
@@ -19,13 +20,16 @@ export function NftTierCard({ item }: NftTierCardProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
   const router = useRouter();
+  const registeredModel = useModelRegistryStore((state) => state.getModelById(item.modelId));
   const model = getDemoModelById(item.modelId) ?? DEMO_MODELS[0];
   const tone = tierCopy[item.tier];
+  const modelName = registeredModel?.displayName ?? model.name;
+  const modelTagline = registeredModel?.bio ?? model.tagline;
 
   return (
     <Pressable
       onPress={() =>
-        router.push({ pathname: '/profile/model/[modelId]', params: { modelId: model.id } })
+        router.push({ pathname: '/profile/model/[modelId]', params: { modelId: item.modelId } })
       }
       style={[styles.card, item.tier === 'diamond' && styles.cardDiamond]}
     >
@@ -41,9 +45,9 @@ export function NftTierCard({ item }: NftTierCardProps) {
       </View>
 
       <Text style={styles.label}>{item.label}</Text>
-      <Text style={styles.modelName}>{model.name}</Text>
+      <Text style={styles.modelName}>{modelName}</Text>
       <Text style={styles.subtitle} numberOfLines={2}>
-        {model.tagline}
+        {modelTagline}
       </Text>
     </Pressable>
   );
